@@ -316,7 +316,7 @@ export default function App() {
       >
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-right">
           <div className="flex items-center gap-2">
-            <img src="/logo-family.jpg" alt="شعار مَسِيري" className="h-5 w-5 rounded-md border object-cover" />
+            <img src="/logo-family.jpg?v=20261010-1" alt="شعار مَسِيري" className="h-5 w-5 rounded-md border object-cover" />
             <span className="font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>مَسِيري</span>
             <span>·</span>
             <span>منصة خدمة المرحلة الإعدادية الكنسية</span>
