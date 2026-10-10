@@ -19,7 +19,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -199,18 +198,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
           </div>
 
-          {/* Remember me */}
-          <div className="flex items-center justify-between text-xs pt-1">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded text-[#76243A] focus:ring-[#76243A]"
-              />
-              <span style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>تذكر تسجيل دخولي</span>
-            </label>
-          </div>
+          <p className="pt-1 text-center text-[11px]" style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
+            ستظل جلسة الدخول محفوظة على هذا الجهاز حتى تسجيل الخروج.
+          </p>
 
           {/* Submit button with Church Burgundy & Gold in Dark Mode */}
           <button
