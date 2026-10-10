@@ -241,7 +241,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             إنشاء حساب جديد في مَسِيري
           </h1>
           <p
-            className="text-xs sm:text-sm font-medium"
+            className="text-sm sm:text-base font-medium leading-relaxed"
             style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}
           >
             منصة المرحلة الإعدادية الكنسية للنمو الروحي والخدمة
@@ -303,6 +303,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 type="text"
                 required
                 value={name}
+                disabled={isLoading}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="مثال: مارك عماد رفعت"
                 className="w-full px-4 py-3 pl-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
@@ -330,6 +331,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 required
                 dir="ltr"
                 value={email}
+                disabled={isLoading}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="example@maseery.org"
                 className="w-full px-4 py-3 pl-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
@@ -342,7 +344,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             <div
               role="status"
               aria-live="polite"
-              className="mt-3 rounded-2xl border px-3.5 py-3 text-xs leading-relaxed"
+              className="mt-3 rounded-2xl border px-3.5 py-3 text-sm sm:text-[15px] leading-relaxed"
               style={{
                 backgroundColor: theme === 'dark' ? 'rgba(39,34,44,.72)' : 'rgba(246,240,227,.85)',
                 borderColor: theme === 'dark' ? 'rgba(214,184,120,.3)' : 'rgba(197,161,90,.38)',
@@ -359,22 +361,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 <span>اكتب بريدًا إلكترونيًا كاملًا للتعرّف على نوع الحساب تلقائيًا.</span>
               )}
             </div>
-            <div className="flex items-center justify-between text-[11px] pt-1">
-              <span className="text-[#77717A] dark:text-[#B8B1BB]">
-                بريد أمين الخدمة العام يحصل تلقائياً على لوحة الإشراف
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('minasamehdeif@gmail.com');
-                  if (!name) setName('مينا سامح ضيف');
-                }}
-                className="font-bold hover:underline"
-                style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}
-              >
-                تعبئة بريد أمين الخدمة
-              </button>
-            </div>
+            <p className="pt-2 text-sm leading-relaxed text-[#77717A] dark:text-[#B8B1BB]">
+              يتم التعرف على نوع الحساب تلقائياً من سجلات الكنيسة. إذا كان البريد معتمداً كخادم أو أمين خدمة أو حساب اختبار، ستظهر الصلاحية المسجلة فقط.
+            </p>
           </div>
 
           {/* Password */}
@@ -393,6 +382,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 required
                 dir="ltr"
                 value={password}
+                disabled={isLoading}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full px-4 py-3 pl-11 pr-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
@@ -403,8 +393,11 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               <Lock className="w-4 h-4 text-[#77717A] dark:text-[#B8B1BB] absolute right-3.5 top-3.5 pointer-events-none" />
               <button
                 type="button"
+                disabled={isLoading}
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute left-3.5 top-3.5 text-[#77717A] dark:text-[#B8B1BB] hover:text-[#272329]"
+                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                className="absolute left-1 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#77717A] hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] dark:text-[#B8B1BB] dark:hover:bg-white/5"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -426,6 +419,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 type="tel"
                 dir="ltr"
                 value={phone}
+                disabled={isLoading}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="01234567890"
                 className="w-full px-4 py-3 pl-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
@@ -464,6 +458,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                     <button
                       key={g.id}
                       type="button"
+                      disabled={isLoading}
                       onClick={() => setGradeLevel(g.id)}
                       className="p-3.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
                       style={{
@@ -503,7 +498,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                         {g.label}
                       </span>
                       <span
-                        className="text-[10px]"
+                        className="text-[11px] leading-snug"
                         style={{
                           color: isSelected
                             ? theme === 'dark' ? '#D6B878' : '#76243A'
@@ -543,11 +538,11 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             {isLoading ? (
               <div className="flex items-center justify-center gap-2.5">
                 <BrandSpinner size="sm" theme={theme} />
-                <span>جاري إنشاء الحساب والتحقق...</span>
+                <span>جارٍ إنشاء الحساب...</span>
               </div>
             ) : (
               <>
-                <span>إنشاء الحساب وبدء المسيرة</span>
+                <span>إنشاء حساب جديد</span>
                 <ChevronLeft className="w-4 h-4" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
               </>
             )}
@@ -580,6 +575,16 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 {submitFeedback.tone === 'error' ? 'لم يكتمل التسجيل' : submitFeedback.tone === 'success' ? 'تمت الاستجابة' : 'حالة التسجيل'}
               </p>
               <p className="mt-1">{submitFeedback.text}</p>
+              {submitFeedback.tone === 'error' && submitFeedback.text.includes('مسجل بالفعل') && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('login')}
+                  className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-bold underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
+                  style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.4)' : '#DFC0CA', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}
+                >
+                  تسجيل الدخول لهذا البريد
+                </button>
+              )}
             </div>
           )}
         </form>
@@ -594,7 +599,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('login')}
-              className="font-bold underline hover:opacity-85 text-[#76243A] dark:text-[#B65370]"
+              className="inline-flex min-h-10 items-center rounded-lg px-2 font-bold underline underline-offset-2 hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] text-[#76243A] dark:text-[#B65370]"
             >
               تسجيل الدخول
             </button>

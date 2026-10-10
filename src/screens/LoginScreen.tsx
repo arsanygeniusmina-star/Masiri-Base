@@ -32,19 +32,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     try {
       window.sessionStorage.setItem('masiri.auth-transition-after-oauth', '1');
     } catch {
-      // The normal post-auth route still works if browser storage is restricted.
+      // Normal redirect still works when browser storage is restricted.
     }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    });
-    if (error) {
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      // Supabase redirects the browser on success; keep loading through that redirect.
+    } catch (error) {
       try {
         window.sessionStorage.removeItem('masiri.auth-transition-after-oauth');
       } catch {
-        // Ignore storage restrictions and show the actual authentication error.
+        // Ignore storage restrictions.
       }
-      setErrorMsg('تسجيل الدخول بجوجل غير مُفعّل بعد. يلزم إعداد Google OAuth في لوحة Supabase أولاً.');
+      console.error('Masiri Google sign-in failed:', error);
+      const detail = error instanceof Error ? error.message : '';
+      setErrorMsg(detail.toLowerCase().includes('provider')
+        ? 'تسجيل الدخول بجوجل غير مُفعّل بعد. يلزم إعداد Google OAuth في لوحة Supabase أولاً.'
+        : detail
+          ? `تعذر بدء تسجيل الدخول بجوجل: ${detail}`
+          : 'تعذر بدء تسجيل الدخول بجوجل. تحقق من الاتصال وحاول مرة أخرى.');
       setIsLoading(false);
     }
   };
@@ -63,6 +73,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
 
     setIsLoading(true);
+    let sessionStarted = false;
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
@@ -83,9 +94,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         return;
       }
 
+      if (!data.session) {
+        setErrorMsg('لم تُنشأ جلسة دخول. تحقق من حالة الحساب ثم حاول مرة أخرى.');
+        return;
+      }
+      sessionStarted = true;
+
       const profile = await fetchUserProfile(data.user.id);
       if (!profile) {
         await supabase.auth.signOut();
+        sessionStarted = false;
         setErrorMsg('تم التحقق من الحساب لكن ملف المستخدم غير موجود. تواصل مع مسؤول مسيري لإصلاح ملف الحساب.');
         return;
       }
@@ -93,6 +111,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       onLoginSuccess(profile);
     } catch (error) {
       console.error('Masiri sign-in failed:', error);
+      if (sessionStarted) {
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.error('Unable to clear incomplete login session:', signOutError);
+        }
+      }
       setErrorMsg('حدث خطأ أثناء الاتصال بقاعدة البيانات. تحقق من الإنترنت ثم حاول مرة أخرى.');
     } finally {
       setIsLoading(false);
@@ -139,7 +164,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             تسجيل الدخول إلى مَسِيري
           </h1>
           <p
-            className="text-xs sm:text-sm font-medium"
+            className="text-sm sm:text-base font-medium leading-relaxed"
             style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}
           >
             منصة خدمة المرحلة الإعدادية الكنسية
@@ -151,7 +176,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         {/* Error notification */}
         {errorMsg && (
           <div
-            className="p-3.5 rounded-2xl text-xs flex items-center gap-2 animate-in fade-in"
+            role="alert"
+            aria-live="assertive"
+            className="p-3.5 rounded-2xl text-sm flex items-start gap-2 leading-relaxed animate-in fade-in"
             style={{
               backgroundColor: theme === 'dark' ? 'rgba(61, 36, 42, 0.75)' : '#F9E9EB',
               color: theme === 'dark' ? '#F08089' : '#B33B49',
@@ -181,6 +208,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 required
                 dir="ltr"
                 value={email}
+                disabled={isLoading}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="example@maseery.org"
                 className="w-full px-4 py-3 pl-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
@@ -216,6 +244,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 required
                 dir="ltr"
                 value={password}
+                disabled={isLoading}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full px-4 py-3 pl-11 pr-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
@@ -227,7 +256,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute left-3.5 top-3.5 text-[#77717A] dark:text-[#B8B1BB] hover:text-[#272329]"
+                disabled={isLoading}
+                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                className="absolute left-1 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#77717A] hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] dark:text-[#B8B1BB] dark:hover:bg-white/5"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -238,19 +270,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             ستظل جلسة الدخول محفوظة على هذا الجهاز حتى تسجيل الخروج.
           </p>
 
-          <button type="button" disabled={isLoading} onClick={async () => {
-            setErrorMsg('');
-            setSuccessMsg('');
-            if (!cleanEmail || !cleanEmail.includes('@')) {
-              setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة المرور.');
-              return;
-            }
-            setIsLoading(true);
-            const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: `${window.location.origin}/?password-reset=1` });
-            setIsLoading(false);
-            if (error) setErrorMsg('تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني.');
-            else setSuccessMsg('إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
-          }} className="w-full text-xs font-bold underline underline-offset-4" style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={async () => {
+              setErrorMsg('');
+              setSuccessMsg('');
+              if (!cleanEmail || !cleanEmail.includes('@')) {
+                setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة المرور.');
+                return;
+              }
+              setIsLoading(true);
+              try {
+                const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+                  redirectTo: `${window.location.origin}/?password-reset=1`,
+                });
+                if (error) {
+                  console.error('Masiri password recovery failed:', error);
+                  setErrorMsg('تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني وحاول لاحقاً.');
+                } else {
+                  setSuccessMsg('إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
+                }
+              } catch (error) {
+                console.error('Masiri password recovery request failed:', error);
+                setErrorMsg('تعذر الاتصال بخادم الحسابات. تحقق من الإنترنت ثم حاول مرة أخرى.');
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-xl px-3 text-sm font-bold underline underline-offset-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
+            style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}
+          >
             نسيت كلمة المرور؟ إرسال رابط استعادة
           </button>
 

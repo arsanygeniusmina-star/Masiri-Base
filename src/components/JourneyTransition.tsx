@@ -4,42 +4,31 @@ interface JourneyTransitionProps {
   theme: 'light' | 'dark';
 }
 
+/** Compact, accessible confirmation after a successful sign-in or sign-up. */
 export const JourneyTransition: React.FC<JourneyTransitionProps> = ({ theme }) => (
   <div
-    className={`journey-transition ${theme === 'dark' ? 'journey-transition--dark' : 'journey-transition--light'}`}
+    className={`auth-success-transition ${theme === 'dark' ? 'auth-success-transition--dark' : 'auth-success-transition--light'}`}
     role="status"
     aria-live="polite"
-    aria-label="جاري بدء رحلتك في مسيري"
+    aria-label="تم تسجيل الدخول بنجاح، مرحباً بك في مسيري"
   >
-    <img
-      className="journey-transition__scene"
-      src="/masiri-journey-icon.jpg?v=20261010-2"
-      alt=""
-      draggable={false}
-    />
-
-    <div className="journey-transition__vignette" aria-hidden="true" />
-    <div className="journey-transition__cross-glow" aria-hidden="true" />
-    <div className="journey-transition__light" aria-hidden="true" />
-
-    <div className="journey-transition__walker" aria-hidden="true">
-      <span className="journey-walker__head" />
-      <span className="journey-walker__neck" />
-      <span className="journey-walker__body" />
-      <span className="journey-walker__backpack" />
-      <span className="journey-walker__arm journey-walker__arm--left" />
-      <span className="journey-walker__arm journey-walker__arm--right" />
-      <span className="journey-walker__leg journey-walker__leg--left" />
-      <span className="journey-walker__leg journey-walker__leg--right" />
-      <span className="journey-walker__foot journey-walker__foot--left" />
-      <span className="journey-walker__foot journey-walker__foot--right" />
+    <div className="auth-success-transition__backdrop" aria-hidden="true" />
+    <div className="auth-success-transition__scene">
+      <img
+        className="auth-success-transition__image"
+        src="/masiri-journey-icon.jpg?v=20261010-2"
+        alt="شعار مسيري: الشخص والطريق المؤدي إلى الصليب"
+        draggable={false}
+      />
+      <div className="auth-success-transition__checkmark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none">
+          <path className="auth-success-transition__check-path" d="M13 24.5 20.5 32 35 16" />
+        </svg>
+      </div>
     </div>
-
-    <div className="journey-transition__caption">
-      <span className="journey-transition__caption-title">مَسِيري</span>
-      <span className="journey-transition__caption-subtitle">تابع رحلتك نحو النور</span>
+    <div className="auth-success-transition__caption">
+      <span className="auth-success-transition__caption-title">تم بنجاح</span>
+      <span className="auth-success-transition__caption-subtitle">أهلاً بك في مَسِيري</span>
     </div>
-
-    <div className="journey-transition__flare" aria-hidden="true" />
   </div>
 );

@@ -30,6 +30,7 @@ interface ProfileScreenProps {
   onUpdateCurrentUser: (updated: User) => void;
   onNavigate: (screen: AppScreen) => void;
   theme: 'light' | 'dark';
+  simulationMode?: boolean;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
@@ -64,6 +65,7 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
   onUpdateCurrentUser,
   onNavigate,
   theme,
+  simulationMode = false,
 }) => {
   const isHead = currentUser.role === 'head';
   const isTeacher = currentUser.role === 'teacher';
@@ -96,6 +98,32 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
     let cancelled = false;
     if (!isHead) return () => { cancelled = true; };
 
+    if (simulationMode) {
+      setTeachersList([
+        {
+          id: 'preview-profile-teacher-1',
+          email: 'anton.teacher@example.test',
+          name: 'الخادم أنطونيوس',
+          assignedGrade: 'grade-1',
+          addedBy: 'TEST SIMULATION',
+          addedAt: new Date().toISOString(),
+          notes: 'بيانات تجريبية',
+          status: 'active',
+        },
+        {
+          id: 'preview-profile-teacher-2',
+          email: 'peter.teacher@example.test',
+          name: 'الخادم بطرس',
+          assignedGrade: 'grade-2',
+          addedBy: 'TEST SIMULATION',
+          addedAt: new Date().toISOString(),
+          notes: 'بيانات تجريبية',
+          status: 'active',
+        },
+      ]);
+      return () => { cancelled = true; };
+    }
+
     const loadTeachers = async () => {
       const { data, error } = await supabase
         .from('teachers_whitelist')
@@ -122,13 +150,24 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
 
     void loadTeachers();
     return () => { cancelled = true; };
-  }, [isHead, currentUser.id]);
+  }, [isHead, currentUser.id, simulationMode]);
 
   // Persist profile changes in Supabase; local storage is not the source of truth for account data.
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveSuccessMsg('');
     setSaveErrorMsg('');
+
+    if (simulationMode) {
+      onUpdateCurrentUser({
+        ...currentUser,
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        churchName: churchName.trim() || undefined,
+      });
+      setSaveSuccessMsg('تم حفظ التغييرات في وضع المحاكاة فقط؛ لم تتغير بيانات أي حساب حقيقي.');
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -165,6 +204,30 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
     const cleanTeacherEmail = newTeacherEmail.trim().toLowerCase();
     if (!cleanTeacherEmail.includes('@')) {
       setWhitelistFeedback({ type: 'error', message: 'يرجى إدخال بريد إلكتروني صالح.' });
+      return;
+    }
+
+    if (simulationMode) {
+      if (teachersList.some((teacher) => teacher.email.toLowerCase() === cleanTeacherEmail)) {
+        setWhitelistFeedback({ type: 'error', message: 'هذا البريد موجود بالفعل في بيانات المحاكاة.' });
+        return;
+      }
+      const previewEntry: TeacherWhitelistEntry = {
+        id: 'preview-profile-teacher-' + Date.now(),
+        email: cleanTeacherEmail,
+        name: newTeacherName.trim() || 'خادم جديد',
+        assignedGrade: newTeacherGrade,
+        addedBy: currentUser.email,
+        addedAt: new Date().toISOString(),
+        notes: newTeacherNotes.trim() || 'تمت الإضافة في وضع المحاكاة',
+        status: 'active',
+      };
+      setTeachersList((previous) => [previewEntry, ...previous]);
+      setNewTeacherEmail('');
+      setNewTeacherName('');
+      setNewTeacherNotes('');
+      setWhitelistFeedback({ type: 'success', message: 'تمت إضافة الخادم في وضع المحاكاة فقط؛ لم تتغير قاعدة البيانات.' });
+      setIsQuickAddModalOpen(false);
       return;
     }
 
@@ -208,7 +271,14 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
   };
 
   const handleRemoveTeacher = async (id: string, teacherName: string) => {
-    if (!isHead || !window.confirm(`هل أنت متأكد من إلغاء اعتماد الخادم (${teacherName})؟`)) return;
+    if (!isHead) return;
+    if (!simulationMode && !window.confirm(`هل أنت متأكد من إلغاء اعتماد الخادم (${teacherName})؟`)) return;
+
+    if (simulationMode) {
+      setTeachersList((previous) => previous.filter((teacher) => teacher.id !== id));
+      setWhitelistFeedback({ type: 'success', message: `تم إلغاء اعتماد ${teacherName} في المحاكاة فقط.` });
+      return;
+    }
 
     const { error } = await supabase.from('teachers_whitelist').delete().eq('id', id);
     if (error) {
