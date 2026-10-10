@@ -20,6 +20,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const cleanEmail = email.trim().toLowerCase();
@@ -111,6 +112,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             منصة خدمة المرحلة الإعدادية الكنسية
           </p>
         </div>
+
+        {successMsg && <div role="status" className="rounded-2xl border p-3.5 text-xs leading-relaxed" style={{ backgroundColor: theme === 'dark' ? 'rgba(32,53,42,.8)' : '#E9F4EC', color: theme === 'dark' ? '#75C695' : '#347653', borderColor: theme === 'dark' ? '#3A3540' : '#B8D7C1' }}>{successMsg}</div>}
 
         {/* Error notification */}
         {errorMsg && (
@@ -204,6 +207,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
           <button type="button" disabled={isLoading} onClick={async () => {
             setErrorMsg('');
+            setSuccessMsg('');
             if (!cleanEmail || !cleanEmail.includes('@')) {
               setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة المرور.');
               return;
@@ -211,7 +215,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             setIsLoading(true);
             const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: `${window.location.origin}/?password-reset=1` });
             setIsLoading(false);
-            setErrorMsg(error ? 'تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني.' : 'إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
+            if (error) setErrorMsg('تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني.');
+            else setSuccessMsg('إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
           }} className="w-full text-xs font-bold underline underline-offset-4" style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
             نسيت كلمة المرور؟ إرسال رابط استعادة
           </button>
