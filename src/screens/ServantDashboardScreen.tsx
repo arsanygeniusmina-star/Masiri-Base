@@ -43,7 +43,7 @@ type ManagedRoleAccount = {
   name: string;
   role: 'teacher' | 'head' | 'test';
   assigned_grade: MiddleSchoolGrade | null;
-  status: string;
+  status: string | null;
   created_at?: string;
 };
 
