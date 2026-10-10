@@ -36,8 +36,6 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [phone, setPhone] = useState('');
   const [gradeLevel, setGradeLevel] = useState<MiddleSchoolGrade>('grade-2');
   const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const [requiresEmailConfirmation, setRequiresEmailConfirmation] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<{ tone: 'info' | 'success' | 'error'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -50,8 +48,6 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    setSuccessMsg('');
-    setRequiresEmailConfirmation(false);
     setSubmitFeedback(null);
 
     if (!name.trim()) {
@@ -89,10 +85,17 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
       });
 
       if (error || !data.user) {
-        const reason = error?.message;
-        const message = reason
-          ? `تعذر إنشاء الحساب: ${reason}`
-          : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.';
+        const reason = error?.message ?? '';
+        const normalizedReason = reason.toLowerCase();
+        const isEmailRateLimit =
+          error?.status === 429 ||
+          normalizedReason.includes('email rate limit exceeded') ||
+          normalizedReason.includes('over_email_send_rate_limit');
+        const message = isEmailRateLimit
+          ? 'رفض خادم الحسابات التسجيل بسبب تجاوز حد إرسال رسائل البريد الإلكتروني. لم يُنشأ الحساب. يلزم إيقاف Confirm email من إعدادات Authentication في مشروع Supabase حتى لا يحتاج التسجيل إلى رسالة تأكيد.'
+          : reason
+            ? `تعذر إنشاء الحساب: ${reason}`
+            : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.';
         console.error('Masiri signup rejected by Supabase Auth:', error ?? 'No user returned');
         setErrorMsg(message);
         setSubmitFeedback({ tone: 'error', text: message });
@@ -100,10 +103,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
       }
 
       if (!data.session) {
-        const message = 'تم إنشاء الحساب، لكن يلزم تأكيد البريد الإلكتروني أولاً. افتح رسالة التأكيد في بريدك، ثم ارجع إلى مسيري وسجّل الدخول. لن نفتح الملف الشخصي قبل اكتمال التحقق من الحساب.';
-        setRequiresEmailConfirmation(true);
-        setSuccessMsg(message);
-        setSubmitFeedback({ tone: 'success', text: message });
+        const message = 'لم تكتمل عملية التسجيل لأن خادم الحسابات لم يمنح جلسة دخول. أوقف Confirm email في إعدادات Authentication بمشروع Supabase، ثم أعد المحاولة.';
+        setErrorMsg(message);
+        setSubmitFeedback({ tone: 'error', text: message });
         return;
       }
 
@@ -211,37 +213,6 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             <div className="min-w-0">
               <p className="font-extrabold">لم يتم إنشاء الحساب</p>
               <p className="mt-1 break-words">{errorMsg}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Success notification */}
-        {successMsg && (
-          <div
-            role="status"
-            className="flex items-start gap-2 rounded-2xl border p-3.5 text-xs"
-            style={{
-              backgroundColor: theme === 'dark' ? 'rgba(32,53,42,.8)' : '#E9F4EC',
-              color: theme === 'dark' ? '#75C695' : '#347653',
-              borderColor: theme === 'dark' ? '#3A3540' : '#B8D7C1',
-            }}
-          >
-            <ShieldCheck className="h-4 w-4 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <span>{successMsg}</span>
-              {requiresEmailConfirmation && (
-                <button
-                  type="button"
-                  onClick={() => onNavigate('login')}
-                  className="mt-3 block rounded-xl border px-3.5 py-2.5 font-bold underline underline-offset-2 transition hover:opacity-85"
-                  style={{
-                    borderColor: theme === 'dark' ? 'rgba(214,184,120,.45)' : '#B7D5BF',
-                    color: theme === 'dark' ? '#F3DEAB' : '#286844',
-                  }}
-                >
-                  الانتقال إلى شاشة تسجيل الدخول
-                </button>
-              )}
             </div>
           </div>
         )}
