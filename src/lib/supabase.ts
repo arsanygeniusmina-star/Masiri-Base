@@ -1,14 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import type { User, MiddleSchoolGrade, UserRole } from '../types';
 
-// The URL and anon/publishable key are public client configuration, never a service-role secret.
-// Keep the existing project's public values as fallback so current deployments continue to work;
-// Vercel/local deployments can override them with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
+// The URL and publishable key are public browser configuration, never a service-role secret.
+// Prefer Supabase's currently active publishable key. The anon-named environment variable is
+// retained as a compatibility fallback for deployments that still provide it.
 export const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || 'https://pduypklunvcsvabireuy.supabase.co';
 export const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6InBkdXlwa2x1bnZjc3ZhYmlyZXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1OTAzMzQsImV4cCI6MjEwNzE2NjMzNH0.5nNn5ltgOpOj3g5akdQerpXvHl1U6Ljz0xZI-lk1Leg';
+  'sb_publishable_GuDGhPahvHnP5-0V6rnzRQ_hJzrUcHL';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
