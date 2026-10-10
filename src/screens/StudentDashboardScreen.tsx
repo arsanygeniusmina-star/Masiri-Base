@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, DailySpiritualTask, MemoryVerse, AchievementBadge, PrayerRequest } from '../types';
 import { Database, CURRENT_WEEK_VERSE } from '../db/storage';
+import { supabase, fetchUserProfile } from '../lib/supabase';
 import {
   CheckCircle2,
   Circle,
@@ -29,36 +30,107 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
   onUpdateUser,
   theme,
 }) => {
-  const [tasks, setTasks] = useState<DailySpiritualTask[]>(Database.getDailyTasks());
+  const [tasks, setTasks] = useState<DailySpiritualTask[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState('');
   const [verse] = useState<MemoryVerse>(CURRENT_WEEK_VERSE);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [badges] = useState<AchievementBadge[]>(Database.getBadges());
   const [prayerContent, setPrayerContent] = useState('');
   const [prayerIsPrivate, setPrayerIsPrivate] = useState(true);
   const [prayerSentMessage, setPrayerSentMessage] = useState('');
-  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>(
-    Database.getPrayerRequests().filter(p => p.studentId === currentUser.id || p.studentName === currentUser.name)
-  );
+  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const loadDashboard = async () => {
+      setTasksLoading(true);
+      setDashboardError('');
+      const [taskResult, logResult, prayerResult] = await Promise.all([
+        supabase.from('daily_tasks').select('id,title,subtitle,category,points').eq('is_active', true).order('title'),
+        supabase.from('student_daily_logs').select('task_id,completed').eq('student_id', currentUser.id).eq('date', today),
+        supabase.from('prayer_requests').select('*').eq('student_id', currentUser.id).order('created_at', { ascending: false }),
+      ]);
+
+      if (cancelled) return;
+      if (taskResult.error || logResult.error || prayerResult.error) {
+        console.error('Unable to load student dashboard data:', taskResult.error || logResult.error || prayerResult.error);
+        setDashboardError('تعذر تحميل بعض البيانات من قاعدة البيانات. تحقق من اتصالك أو صلاحيات الحساب.');
+      }
+
+      const completedIds = new Set(
+        (logResult.data || []).filter((row: any) => row.completed).map((row: any) => row.task_id as string)
+      );
+      const mappedTasks: DailySpiritualTask[] = (taskResult.data || []).map((row: any) => ({
+        id: row.id,
+        title: row.title,
+        subtitle: row.subtitle || '',
+        category: ['prayer', 'bible', 'liturgy', 'verse', 'kindness'].includes(row.category) ? row.category : 'prayer',
+        points: Number(row.points || 0),
+        completed: completedIds.has(row.id),
+      }));
+      setTasks(mappedTasks);
+
+      setPrayerRequests((prayerResult.data || []).map((row: any) => ({
+        id: row.id,
+        studentId: row.student_id,
+        studentName: row.student_name,
+        content: row.content,
+        isPrivate: Boolean(row.is_private),
+        status: row.status === 'prayed' ? 'prayed' : 'pending',
+        createdAt: row.created_at,
+      })));
+      setTasksLoading(false);
+    };
+
+    void loadDashboard();
+    return () => { cancelled = true; };
+  }, [currentUser.id]);
 
   const [showConfettiNotice, setShowConfettiNotice] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState<AchievementBadge | null>(null);
   const [copiedVerse, setCopiedVerse] = useState(false);
 
-  // Toggle task completion
-  const handleToggleTask = (taskId: string) => {
-    const res = Database.toggleDailyTask(taskId);
-    if (res) {
-      const updatedTasks = Database.getDailyTasks();
-      setTasks(updatedTasks);
-      const updatedUser = Database.getCurrentUser();
-      if (updatedUser) {
-        onUpdateUser(updatedUser);
-      }
-      // Check if all completed
-      if (updatedTasks.every(t => t.completed)) {
-        setShowConfettiNotice(true);
-        setTimeout(() => setShowConfettiNotice(false), 5000);
-      }
+  // Persist task completion to Supabase; the database trigger keeps points consistent.
+  const handleToggleTask = async (taskId: string) => {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const nextCompleted = !task.completed;
+    setDashboardError('');
+
+    const { error } = await supabase
+      .from('student_daily_logs')
+      .upsert({
+        student_id: currentUser.id,
+        task_id: taskId,
+        date: today,
+        completed: nextCompleted,
+      }, { onConflict: 'student_id,task_id,date' });
+
+    if (error) {
+      console.error('Unable to save task completion:', error);
+      setDashboardError('لم يتم حفظ المهمة. حاول مرة أخرى بعد التحقق من الاتصال.');
+      return;
+    }
+
+    const updatedTasks = tasks.map((item) => item.id === taskId ? { ...item, completed: nextCompleted } : item);
+    setTasks(updatedTasks);
+    if (updatedTasks.length > 0 && updatedTasks.every((item) => item.completed)) {
+      setShowConfettiNotice(true);
+      window.setTimeout(() => setShowConfettiNotice(false), 5000);
+    }
+
+    try {
+      const updatedUser = await fetchUserProfile(currentUser.id);
+      if (updatedUser) onUpdateUser(updatedUser);
+    } catch (error) {
+      console.error('Unable to refresh student points:', error);
     }
   };
 
@@ -72,20 +144,58 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
   const completedCount = tasks.filter(t => t.completed).length;
   const progressPercent = Math.round((completedCount / tasks.length) * 100);
 
-  // Send prayer request
-  const handleSendPrayer = (e: React.FormEvent) => {
+  // Store prayer requests in the shared database with the authenticated student's ID.
+  const handleSendPrayer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prayerContent.trim()) return;
+    const content = prayerContent.trim();
+    if (!content) return;
 
-    Database.addPrayerRequest(currentUser.name, prayerContent, prayerIsPrivate);
+    setDashboardError('');
+    const { data, error } = await supabase
+      .from('prayer_requests')
+      .insert({
+        student_id: currentUser.id,
+        student_name: currentUser.name,
+        content,
+        is_private: prayerIsPrivate,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Unable to save prayer request:', error);
+      setDashboardError('تعذر إرسال طلب الصلاة. حاول مرة أخرى.');
+      return;
+    }
+
+    const newRequest: PrayerRequest = {
+      id: data.id,
+      studentId: data.student_id,
+      studentName: data.student_name,
+      content: data.content,
+      isPrivate: Boolean(data.is_private),
+      status: data.status === 'prayed' ? 'prayed' : 'pending',
+      createdAt: data.created_at,
+    };
+    setPrayerRequests((previous) => [newRequest, ...previous]);
     setPrayerContent('');
-    setPrayerSentMessage('تم إرسال طلب الصلاة لخادم فصلك، نذكرك في صلواتنا دائماً!');
-    setPrayerRequests(Database.getPrayerRequests().filter(p => p.studentId === currentUser.id || p.studentName === currentUser.name));
-    setTimeout(() => setPrayerSentMessage(''), 4000);
+    setPrayerSentMessage('تم حفظ طلب الصلاة في قاعدة البيانات. نذكرك في صلواتنا دائماً!');
+    window.setTimeout(() => setPrayerSentMessage(''), 4000);
   };
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 relative">
+      {(dashboardError || (tasksLoading && 'جاري تحميل مهامك من قاعدة البيانات...')) && (
+        <div role={dashboardError ? 'alert' : 'status'} className="relative z-10 rounded-2xl border p-3.5 text-sm"
+          style={{
+            backgroundColor: dashboardError ? (theme === 'dark' ? 'rgba(61,36,42,.75)' : '#F9E9EB') : (theme === 'dark' ? 'rgba(52,45,32,.55)' : '#F6F0E3'),
+            color: dashboardError ? (theme === 'dark' ? '#F08089' : '#B33B49') : (theme === 'dark' ? '#D6B878' : '#765A22'),
+            borderColor: theme === 'dark' ? '#69404D' : '#DFC0CA',
+          }}>
+          {dashboardError || 'جاري تحميل مهامك من قاعدة البيانات...'}
+        </div>
+      )}
+
       {/* Background Ambient Glow */}
       <div className="absolute top-10 right-10 w-96 h-96 rounded-full bg-[#76243A]/15 dark:bg-[#B65370]/15 blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-96 h-96 rounded-full bg-[#C5A15A]/15 dark:bg-[#D6B878]/10 blur-3xl pointer-events-none" />
