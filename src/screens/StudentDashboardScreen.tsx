@@ -133,7 +133,8 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
     if (simulationMode) {
       const updatedTasks = tasks.map((item) => item.id === taskId ? { ...item, completed: nextCompleted } : item);
       setTasks(updatedTasks);
-      onUpdateUser({ ...currentUser, points: Math.max(0, currentUser.points + (nextCompleted ? task.points : -task.points)) });
+      // Keep the app's real identity as TEST; the selected role is only a simulated view.
+      onUpdateUser({ ...currentUser, role: 'test', points: Math.max(0, currentUser.points + (nextCompleted ? task.points : -task.points)) });
       const completedTasks = updatedTasks.filter((item) => item.completed).length;
       setBadges(Database.getBadges().map((badge, index) => ({ ...badge, isUnlocked: index < completedTasks })));
       if (updatedTasks.length > 0 && updatedTasks.every((item) => item.completed)) {
