@@ -46,7 +46,19 @@ export default function App() {
         }
         setCurrentUser(profile);
         setSessionReady(true);
-        if (navigateToDashboard) setCurrentScreen(dashboardFor(profile));
+        if (navigateToDashboard) {
+          setCurrentScreen(dashboardFor(profile));
+        } else {
+          // Re-route an open dashboard when a head changes this account's role.
+          // RLS protects the data immediately; this refresh updates the visible UI too.
+          setCurrentScreen((previousScreen) =>
+            previousScreen === 'dashboard' ||
+            previousScreen === 'student-dashboard' ||
+            previousScreen === 'servant-dashboard'
+              ? dashboardFor(profile)
+              : previousScreen
+          );
+        }
       } catch (error) {
         console.error('Unable to load the authenticated Masiri profile:', error);
         if (active) {
@@ -68,9 +80,31 @@ export default function App() {
       }, 0);
     });
 
+    const refreshCurrentProfile = async () => {
+      if (document.visibilityState === 'hidden') return;
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Unable to refresh the active Masiri session:', error);
+        return;
+      }
+      void hydrateSession(data.session?.user.id ?? null, false);
+    };
+
+    // A role may be revoked while a teacher leaves the app open. The database's
+    // RLS checks take effect immediately; refresh the profile so the dashboard
+    // also switches to the account's new role within at most about 30 seconds.
+    window.addEventListener('focus', refreshCurrentProfile);
+    document.addEventListener('visibilitychange', refreshCurrentProfile);
+    const profileRefreshInterval = window.setInterval(() => {
+      void refreshCurrentProfile();
+    }, 30_000);
+
     return () => {
       active = false;
       subscription.unsubscribe();
+      window.removeEventListener('focus', refreshCurrentProfile);
+      document.removeEventListener('visibilitychange', refreshCurrentProfile);
+      window.clearInterval(profileRefreshInterval);
     };
   }, []);
 

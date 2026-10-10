@@ -29,6 +29,21 @@ interface ServantDashboardScreenProps {
   theme: 'light' | 'dark';
 }
 
+type TeacherApproval = {
+  id: string;
+  email: string;
+  name: string;
+  assigned_grade: MiddleSchoolGrade | null;
+  status: string | null;
+};
+
+const gradeLabel = (grade: MiddleSchoolGrade | null) => {
+  if (grade === 'grade-1') return 'الصف السابع (أولى إعدادي)';
+  if (grade === 'grade-2') return 'الصف الثامن (تانية إعدادي)';
+  if (grade === 'grade-3') return 'الصف التاسع (تالتة إعدادي)';
+  return 'لم يتم تحديد الصف';
+};
+
 export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   currentUser,
   onNavigate,
@@ -41,6 +56,8 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [approvedTeachersCount, setApprovedTeachersCount] = useState(0);
+  const [teacherApprovals, setTeacherApprovals] = useState<TeacherApproval[]>([]);
+  const [savingTeacherId, setSavingTeacherId] = useState<string | null>(null);
   const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
   const [bonusPoints, setBonusPoints] = useState(25);
   const [bonusReason, setBonusReason] = useState('حفظ آية الأسبوع والتسميع المتقن');
@@ -64,8 +81,19 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
       if (cancelled) return;
 
       if (currentUser.role === 'head') {
-        const { count, error: countError } = await supabase.from('teachers_whitelist').select('id', { count: 'exact', head: true });
-        if (!cancelled && !countError) setApprovedTeachersCount(count || 0);
+        const { data: approvalRows, error: approvalsError } = await supabase
+          .from('teachers_whitelist')
+          .select('id, email, name, assigned_grade, status')
+          .order('created_at', { ascending: false });
+
+        if (!cancelled && !approvalsError) {
+          const rows = (approvalRows || []) as TeacherApproval[];
+          setTeacherApprovals(rows);
+          setApprovedTeachersCount(rows.filter((row) => row.status === 'active' && row.assigned_grade).length);
+        } else if (!cancelled && approvalsError) {
+          console.error('Unable to load teacher approvals:', approvalsError);
+          setFeedbackToast('تعذر تحميل قائمة الخدام المعتمدين.');
+        }
       }
 
       if (studentsResult.error || prayersResult.error) {
@@ -149,23 +177,91 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
       return;
     }
 
-    const { error } = await supabase.from('teachers_whitelist').insert({
+    const { data, error } = await supabase.from('teachers_whitelist').insert({
       email,
       name: newTeacherName.trim() || 'خادم جديد',
       assigned_grade: newTeacherGrade,
       added_by: currentUser.email,
       notes: 'تمت الإضافة من لوحة الخدمة',
       status: 'active',
-    });
+    }).select('id, email, name, assigned_grade, status').single();
 
     if (error) {
       setFeedbackToast(error.code === '23505' ? 'هذا البريد مسجل بالفعل.' : 'تعذرت إضافة الخادم. تأكد من صلاحية أمين الخدمة.');
-    } else {
-      setFeedbackToast(`تم اعتماد ${email} في قاعدة البيانات. سيتم تحديد دوره عند التسجيل.`);
+    } else if (data) {
+      const nextApprovals = [data as TeacherApproval, ...teacherApprovals];
+      setTeacherApprovals(nextApprovals);
+      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
+      setFeedbackToast(`تم اعتماد ${email} للصف المحدد. ستتحدث صلاحيات الحساب الحالي تلقائياً من قاعدة البيانات.`);
       setNewTeacherEmail('');
       setNewTeacherName('');
+      setNewTeacherGrade('grade-2');
       setIsQuickAddModalOpen(false);
     }
+    window.setTimeout(() => setFeedbackToast(''), 4000);
+  };
+
+  const handleUpdateTeacherGrade = async (teacherId: string, grade: MiddleSchoolGrade) => {
+    if (!isHead) return;
+    setSavingTeacherId(teacherId);
+
+    const { data, error } = await supabase
+      .from('teachers_whitelist')
+      .update({ assigned_grade: grade })
+      .eq('id', teacherId)
+      .select('id, email, name, assigned_grade, status')
+      .single();
+
+    if (error || !data) {
+      console.error('Unable to update teacher grade:', error);
+      setFeedbackToast('تعذر حفظ الصف المسند إلى الخادم.');
+    } else {
+      const nextApprovals = teacherApprovals.map((teacher) =>
+        teacher.id === teacherId ? data as TeacherApproval : teacher
+      );
+      setTeacherApprovals(nextApprovals);
+      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
+      setFeedbackToast('تم حفظ الصف، وحدّثت قاعدة البيانات صلاحيات الخادم المرتبطة به.');
+    }
+
+    setSavingTeacherId(null);
+    window.setTimeout(() => setFeedbackToast(''), 3500);
+  };
+
+  const handleToggleTeacherApproval = async (teacher: TeacherApproval) => {
+    if (!isHead) return;
+    const nextStatus = teacher.status === 'active' ? 'inactive' : 'active';
+    if (nextStatus === 'active' && !teacher.assigned_grade) {
+      setFeedbackToast('اختر الصف المسند إلى الخادم أولاً، ثم أعد اعتماده.');
+      window.setTimeout(() => setFeedbackToast(''), 3500);
+      return;
+    }
+
+    setSavingTeacherId(teacher.id);
+    const { data, error } = await supabase
+      .from('teachers_whitelist')
+      .update({ status: nextStatus })
+      .eq('id', teacher.id)
+      .select('id, email, name, assigned_grade, status')
+      .single();
+
+    if (error || !data) {
+      console.error('Unable to change teacher approval:', error);
+      setFeedbackToast('تعذر تغيير حالة اعتماد الخادم. لم يتم تغيير الحالة في الواجهة.');
+    } else {
+      const nextApprovals = teacherApprovals.map((row) =>
+        row.id === teacher.id ? data as TeacherApproval : row
+      );
+      setTeacherApprovals(nextApprovals);
+      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
+      setFeedbackToast(
+        nextStatus === 'active'
+          ? 'تمت إعادة اعتماد الخادم وتحديث دوره من قاعدة البيانات.'
+          : 'تم إيقاف اعتماد الخادم وسحب صلاحيات المعلم من قاعدة البيانات.'
+      );
+    }
+
+    setSavingTeacherId(null);
     window.setTimeout(() => setFeedbackToast(''), 4000);
   };
 
@@ -333,6 +429,93 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
           </p>
         </div>
       </div>
+
+      {isHead && (
+        <section className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right liquid-glass-card backdrop-blur-3xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4"
+            style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+            <div>
+              <h2 className="text-lg font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+                إدارة اعتماد الخدام
+              </h2>
+              <p className="mt-1 text-xs text-[#77717A] dark:text-[#B8B1BB]">
+                تغيير الصف أو إيقاف الاعتماد يحدّث صلاحيات الحساب مباشرةً في قاعدة البيانات.
+              </p>
+            </div>
+            <span className="text-xs text-[#77717A] dark:text-[#B8B1BB]">
+              {teacherApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length} خادم نشط
+            </span>
+          </div>
+
+          {teacherApprovals.length === 0 ? (
+            <p className="rounded-2xl border p-4 text-xs text-[#77717A] dark:text-[#B8B1BB]"
+              style={{ borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0' }}>
+              لا توجد اعتمادات مسجلة حتى الآن.
+            </p>
+          ) : (
+            <div className="divide-y" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+              {teacherApprovals.map((teacher) => {
+                const isActive = teacher.status === 'active' && Boolean(teacher.assigned_grade);
+                const isSaving = savingTeacherId === teacher.id;
+                return (
+                  <div key={teacher.id} className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>{teacher.name}</p>
+                      <p className="mt-1 text-[11px] font-mono text-[#77717A] dark:text-[#B8B1BB]" dir="ltr">{teacher.email}</p>
+                      <p className="mt-1 text-[11px]" style={{ color: isActive ? (theme === 'dark' ? '#75C695' : '#347653') : (theme === 'dark' ? '#D6B878' : '#A96F19') }}>
+                        {isActive ? 'معتمد ونشط' : teacher.status === 'active' ? 'نشط لكن يحتاج تحديد الصف' : 'موقوف'}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <label className="flex items-center gap-2 text-xs">
+                        <span className="whitespace-nowrap text-[#77717A] dark:text-[#B8B1BB]">الصف:</span>
+                        <select
+                          aria-label={`الصف المسند إلى ${teacher.name}`}
+                          value={teacher.assigned_grade || ''}
+                          disabled={isSaving}
+                          onChange={(event) => {
+                            const value = event.target.value as MiddleSchoolGrade;
+                            if (value) void handleUpdateTeacherGrade(teacher.id, value);
+                          }}
+                          className="rounded-xl border px-3 py-2 text-xs"
+                          style={{
+                            backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
+                            borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
+                            color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                          }}
+                        >
+                          <option value="" disabled>اختر الصف</option>
+                          <option value="grade-1">الصف السابع</option>
+                          <option value="grade-2">الصف الثامن</option>
+                          <option value="grade-3">الصف التاسع</option>
+                        </select>
+                      </label>
+
+                      <button
+                        type="button"
+                        disabled={isSaving || (teacher.status !== 'active' && !teacher.assigned_grade)}
+                        onClick={() => void handleToggleTeacherApproval(teacher)}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{
+                          borderColor: teacher.status === 'active'
+                            ? (theme === 'dark' ? 'rgba(214, 100, 120, 0.55)' : '#DFC0CA')
+                            : (theme === 'dark' ? 'rgba(117, 198, 149, 0.45)' : '#B9DCC4'),
+                          color: teacher.status === 'active'
+                            ? (theme === 'dark' ? '#F0A6B2' : '#9D3048')
+                            : (theme === 'dark' ? '#75C695' : '#347653'),
+                        }}
+                      >
+                        {isSaving ? 'جارٍ الحفظ...' : teacher.status === 'active' ? 'إيقاف الاعتماد' : 'إعادة الاعتماد'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Students Table with Search & Filter */}
       <div
@@ -603,6 +786,25 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
                     color: theme === 'dark' ? '#F5F1F0' : '#272329',
                   }}
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold block">الصف المسند إلى الخادم:</label>
+                <select
+                  required
+                  value={newTeacherGrade}
+                  onChange={(event) => setNewTeacherGrade(event.target.value as MiddleSchoolGrade)}
+                  className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
+                    borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
+                    color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                  }}
+                >
+                  <option value="grade-1">الصف السابع (أولى إعدادي)</option>
+                  <option value="grade-2">الصف الثامن (تانية إعدادي)</option>
+                  <option value="grade-3">الصف التاسع (تالتة إعدادي)</option>
+                </select>
               </div>
 
               <button
