@@ -30,7 +30,7 @@ export default defineConfig(() => {
       },
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['masiri-journey-icon-v2.jpg', 'masiri-journey-icon.jpg', 'logo-family.jpg', 'logo-church-light.png', 'logo-church-dark.png'],
+        includeAssets: ['masiri-journey-icon.jpg', 'logo-family.jpg', 'logo-church-light.png', 'logo-church-dark.png'],
         manifest: {
           id: '/',
           name: 'مسيري | Maseery',
@@ -43,8 +43,8 @@ export default defineConfig(() => {
           scope: '/',
           icons: [
             {
-              src: '/masiri-journey-icon-v2.jpg?v=20261010-3',
-              sizes: '512x512',
+              src: '/masiri-journey-icon.jpg?v=20261010-2',
+              sizes: '256x256',
               type: 'image/jpeg',
               purpose: 'any',
             },
