@@ -164,9 +164,8 @@ const DEFAULT_SUPABASE_CONFIG: SupabaseConfig = {
   url: 'https://pduypklunvcsvabireuy.supabase.co',
   anonKey:
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkdXlwa2x1bnZjc3ZhYmlyZXV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1OTAzMzQsImV4cCI6MjEwNzE2NjMzNH0.5nNn5ltgOpOj3g5akdQerpXvHl1U6Ljz0xZI-lk1Leg',
-  isConnected: true,
-  autoSync: true,
-  lastSync: '2026-10-09T23:21:00Z',
+  isConnected: false,
+  autoSync: false,
 };
 
 // Database Service Interface
@@ -586,6 +585,4 @@ create policy "Servants can view teachers_whitelist" on public.teachers_whitelis
 `;
   },
 };
-
-// Clear all users except the head, and ensure the head signs up next time he enters
-Database.purgeAllUsersExceptHeadAndRequireSignUp();
+ 
