@@ -307,7 +307,7 @@ export default function App() {
       </main>
 
       <footer
-        className="relative z-10 hidden border-t px-4 py-8 text-xs transition-colors md:block sm:px-6 lg:px-8"
+        className="relative z-10 border-t px-4 py-6 text-xs transition-colors sm:px-6 lg:px-8"
         style={{
           borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
           backgroundColor: theme === 'dark' ? '#211F25' : '#FFFFFF',
@@ -323,9 +323,14 @@ export default function App() {
           </div>
           <span className="text-[11px]">«لاَ يَمْنَعْكَ صِبَاكَ مِنْ أَنْ تَكُونَ قُدْوَةً لِلْمُؤْمِنِينَ» (١ تيموثاوس ٤: ١٢)</span>
           <img
-            src={theme === 'dark' ? '/logo-church-dark.png' : '/logo-church-light.png'}
+            src={theme === 'dark' ? '/logo-church-dark.png?v=20261010-2' : '/logo-church-light.png?v=20261010-2'}
             alt="شعار الكنيسة"
             className="h-auto w-[170px] max-w-full object-contain"
+            style={{
+              filter: theme === 'dark'
+                ? 'contrast(1.1) brightness(1.12)'
+                : 'contrast(1.4) saturate(1.55) brightness(0.72)',
+            }}
           />
           <span className="text-[11px]">جميع الحقوق محفوظة</span>
         </div>

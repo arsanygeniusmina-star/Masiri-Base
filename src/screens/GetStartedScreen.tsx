@@ -43,8 +43,8 @@ export const GetStartedScreen: React.FC<GetStartedScreenProps> = ({
             }}
           >
             <img
-              src="/logo-family.jpg?v=20261010-1"
-              alt="شعار مَسِيري الرسمي"
+              src="/masiri-journey-icon.jpg?v=20261010-2"
+              alt="طريق مسيري إلى الصليب"
               className="w-full h-full object-cover rounded-2xl"
             />
           </div>
