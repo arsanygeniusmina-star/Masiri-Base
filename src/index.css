@@ -1,0 +1,290 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #76243A;
+    --primary-hover: #5D192D;
+    --primary-soft: #F3E7EB;
+    --primary-border: #DFC0CA;
+    --gold: #C5A15A;
+    --gold-hover: #AF8B45;
+    --gold-soft: #F6F0E3;
+    --background: #F8F7F4;
+    --surface: #FFFFFF;
+    --surface-secondary: #F2F0ED;
+    --surface-hover: #F6F3F1;
+    --text-primary: #272329;
+    --text-secondary: #77717A;
+    --text-muted: #99939A;
+    --border: #E7E2E0;
+    --success: #347653;
+    --success-soft: #E9F4EC;
+    --warning: #A96F19;
+    --warning-soft: #FBF2DE;
+    --error: #B33B49;
+    --error-soft: #F9E9EB;
+    --info: #356D9A;
+
+    --btn-primary-bg: #76243A;
+    --btn-primary-text: #FFFFFF;
+  }
+
+  .dark {
+    --primary: #76243A;
+    --primary-hover: #541424;
+    --primary-soft: #38232C;
+    --primary-border: #69404D;
+    --gold: #D6B878;
+    --gold-hover: #E2C98E;
+    --gold-soft: #342D20;
+    --background: #141217;
+    --surface: #201C24;
+    --surface-secondary: #29242F;
+    --surface-hover: #322C38;
+    --text-primary: #F5F1F0;
+    --text-secondary: #B8B1BB;
+    --text-muted: #89828D;
+    --border: #3A3540;
+    --success: #75C695;
+    --success-soft: #20352A;
+    --warning: #E4B45E;
+    --warning-soft: #392F1D;
+    --error: #F08089;
+    --error-soft: #3D242A;
+    --info: #83B9E5;
+
+    /* In dark mode: Buttons burgundy, text and icons gold! */
+    --btn-primary-bg: #76243A;
+    --btn-primary-text: #F3DEAB;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Scrollbar for refined minimalist church feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* RTL Helpers */
+[dir="rtl"] input,
+[dir="rtl"] textarea {
+  text-align: right;
+}
+
+/* Fluid Liquid Glassmorphism Utilities */
+@keyframes floatOrb1 {
+  0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
+  33% { transform: translate(-35px, -45px) scale(1.15) rotate(15deg); }
+  66% { transform: translate(25px, -20px) scale(0.92) rotate(-10deg); }
+}
+
+@keyframes floatOrb2 {
+  0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
+  33% { transform: translate(40px, 35px) scale(0.88) rotate(-12deg); }
+  66% { transform: translate(-30px, 20px) scale(1.18) rotate(18deg); }
+}
+
+@keyframes floatOrb3 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(20px, -40px) scale(1.1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 15px rgba(214, 184, 120, 0.4)); }
+  50% { opacity: 0.9; filter: drop-shadow(0 0 25px rgba(214, 184, 120, 0.75)); }
+}
+
+@keyframes flameWave {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.1) rotate(4deg); }
+  75% { transform: scale(0.95) rotate(-4deg); }
+}
+
+.liquid-orb-burgundy {
+  animation: floatOrb1 18s ease-in-out infinite;
+}
+
+.liquid-orb-gold {
+  animation: floatOrb2 22s ease-in-out infinite;
+}
+
+.liquid-orb-amber {
+  animation: floatOrb3 15s ease-in-out infinite;
+}
+
+.glow-pulse {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.flame-anim {
+  animation: flameWave 1.8s ease-in-out infinite;
+}
+
+/* Super Liquid Glass Card */
+.liquid-glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 24px 60px -12px rgba(118, 36, 58, 0.12),
+              0 8px 24px -4px rgba(197, 161, 90, 0.1),
+              inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .liquid-glass-card {
+  background: rgba(24, 20, 27, 0.72);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(214, 184, 120, 0.22);
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.75),
+              0 8px 24px -4px rgba(118, 36, 58, 0.35),
+              inset 0 1px 1px rgba(214, 184, 120, 0.28);
+}
+
+.liquid-glass-pill {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 10px 25px -5px rgba(118, 36, 58, 0.08),
+              inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+.dark .liquid-glass-pill {
+  background: rgba(35, 29, 39, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(214, 184, 120, 0.25);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5),
+              inset 0 1px 1px rgba(214, 184, 120, 0.2);
+}
+
+.liquid-glass-input {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(223, 192, 202, 0.6);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.dark .liquid-glass-input {
+  background: rgba(34, 28, 39, 0.6);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(105, 64, 77, 0.5);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* Dedicated Church Button: Burgundy with Gold text in Dark Mode */
+.church-btn-primary,
+.church-btn {
+  background: linear-gradient(135deg, #76243A 0%, #5D192D 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 10px 25px -5px rgba(118, 36, 58, 0.35);
+  transition: all 0.2s ease;
+}
+
+.church-btn-primary svg,
+.church-btn svg {
+  color: #FFFFFF;
+  transition: color 0.2s ease;
+}
+
+/* User requirement: In dark mode, buttons MUST be burgundy and text gold! */
+.dark .church-btn-primary,
+.dark .church-btn,
+.dark .btn-burgundy,
+.dark button.church-btn-primary {
+  background: linear-gradient(135deg, #76243A 0%, #541424 100%) !important;
+  color: #F3DEAB !important;
+  border: 1px solid rgba(214, 184, 120, 0.45) !important;
+  box-shadow: 0 10px 28px -5px rgba(118, 36, 58, 0.65), 0 0 16px rgba(214, 184, 120, 0.2) !important;
+}
+
+.dark .church-btn-primary svg,
+.dark .church-btn svg,
+.dark .btn-burgundy svg,
+.dark button.church-btn-primary svg,
+.dark .church-btn-primary span,
+.dark .church-btn span {
+  color: #F3DEAB !important;
+}
+
+.dark .church-btn-primary:hover,
+.dark .church-btn:hover {
+  background: linear-gradient(135deg, #872942 0%, #5D192D 100%) !important;
+  border-color: rgba(243, 222, 171, 0.65) !important;
+  box-shadow: 0 12px 32px -4px rgba(118, 36, 58, 0.75), 0 0 20px rgba(243, 222, 171, 0.3) !important;
+}
+
+/* Brand Burgundy & Gold Loading Skeletons and Spinners */
+@keyframes brandShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.brand-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(118, 36, 58, 0.08) 0%,
+    rgba(197, 161, 90, 0.18) 50%,
+    rgba(118, 36, 58, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: brandShimmer 1.8s infinite linear;
+}
+
+.dark .brand-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(118, 36, 58, 0.22) 0%,
+    rgba(214, 184, 120, 0.35) 50%,
+    rgba(118, 36, 58, 0.22) 100%
+  );
+  background-size: 200% 100%;
+  animation: brandShimmer 1.8s infinite linear;
+}
+
+@keyframes spinnerRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.brand-spinner {
+  display: inline-block;
+  border-radius: 9999px;
+  animation: spinnerRotate 0.85s linear infinite;
+}
+
