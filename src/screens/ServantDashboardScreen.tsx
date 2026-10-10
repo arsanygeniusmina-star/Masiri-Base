@@ -204,14 +204,11 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
       return;
     }
 
-    const { data, error: refreshError } = await supabase.from('users').select('*').eq('role', 'student').order('name');
-    if (!refreshError && data) {
-      setStudents(data.map((row: any) => ({
-        id: row.id, name: row.name, email: row.email, gradeLevel: row.grade_level || 'grade-2',
-        churchFamily: row.church_family || '', spiritualFather: row.spiritual_father || '',
-        phone: row.phone || '', attendanceRate: 0, points: Number(row.points || 0),
-        streakDays: Number(row.streak_days || 0), lastActive: row.created_at || '', teacherNotes: '',
-      })));
+    const { data: updatedStudent, error: refreshError } = await supabase.from('users').select('id,points').eq('id', studentId).maybeSingle();
+    if (!refreshError && updatedStudent) {
+      setStudents((previous) => previous.map((student) =>
+        student.id === studentId ? { ...student, points: Number(updatedStudent.points || 0) } : student
+      ));
     }
     setAwardingStudentId(null);
     setLatestPointReasons((previous) => ({ ...previous, [studentId]: bonusReason.trim() }));
