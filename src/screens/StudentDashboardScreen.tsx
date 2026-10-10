@@ -155,7 +155,6 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
       .from('prayer_requests')
       .insert({
         student_id: currentUser.id,
-        student_name: currentUser.name,
         content,
         is_private: prayerIsPrivate,
       })
