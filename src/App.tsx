@@ -25,6 +25,7 @@ const authenticatedHomeFor = (user: User): AppScreen =>
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [previewRole, setPreviewRole] = useState<UserRole | null>(null);
+  const [previewProfile, setPreviewProfile] = useState<Partial<User> | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('get-started');
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => window.location.search.includes('password-reset=1'));
   const [theme, setTheme] = useState<'light' | 'dark'>(() => Database.getTheme());
@@ -51,7 +52,7 @@ export default function App() {
       setCurrentScreen(destination);
       setJourneyTransitionUser(null);
       setJourneyDestination(null);
-    }, 4300);
+    }, 1750);
 
     return () => window.clearTimeout(transitionTimer);
   }, [journeyTransitionUser, journeyDestination]);
@@ -183,12 +184,14 @@ export default function App() {
     }
     setCurrentUser(null);
     setPreviewRole(null);
+    setPreviewProfile(null);
     setCurrentScreen('get-started');
   };
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     setPreviewRole(null);
+    setPreviewProfile(null);
     setJourneyDestination(authenticatedHomeFor(user));
     setJourneyTransitionUser(user);
   };
@@ -196,12 +199,18 @@ export default function App() {
   const handleSignUpSuccess = (user: User) => {
     setCurrentUser(user);
     setPreviewRole(null);
+    setPreviewProfile(null);
     // After registration, collect the user's remaining profile details first.
     setJourneyDestination('profile');
     setJourneyTransitionUser(user);
   };
 
   const handleUpdateCurrentUser = (updated: User) => {
+    if (currentUser?.role === 'test' && previewRole) {
+      // Preview edits remain local and never overwrite the authenticated TEST profile.
+      setPreviewProfile({ ...updated, role: previewRole });
+      return;
+    }
     setCurrentUser(updated);
   };
 
@@ -236,6 +245,7 @@ export default function App() {
   const handlePreviewRoleSelection = (role: UserRole | null) => {
     if (currentUser?.role !== 'test') return;
     setPreviewRole(role);
+    setPreviewProfile(null);
     if (!role) {
       setCurrentScreen('test');
       return;
@@ -250,22 +260,27 @@ export default function App() {
     setCurrentScreen(dashboardFor(previewUser));
   };
 
+  const simulationMode = currentUser?.role === 'test' && Boolean(previewRole);
+  const displayUser: User | null = currentUser?.role === 'test' && previewRole
+    ? {
+        ...currentUser,
+        ...(previewProfile ?? {}),
+        role: previewRole,
+        gradeLevel: previewRole === 'student' || previewRole === 'teacher'
+          ? previewProfile?.gradeLevel ?? currentUser.gradeLevel ?? 'grade-1'
+          : undefined,
+      }
+    : currentUser;
+
   const renderDashboard = () => {
-    if (!currentUser) return null;
-    const displayUser: User = currentUser.role === 'test' && previewRole ? {
-      ...currentUser,
-      role: previewRole,
-      gradeLevel: previewRole === 'student' || previewRole === 'teacher'
-        ? currentUser.gradeLevel ?? 'grade-1'
-        : undefined,
-    } : currentUser;
+    if (!displayUser) return null;
     if (displayUser.role === 'student') {
       return (
         <StudentDashboardScreen
           currentUser={displayUser}
           onUpdateUser={handleUpdateCurrentUser}
           theme={theme}
-          simulationMode={currentUser.role === 'test' && Boolean(previewRole)}
+          simulationMode={simulationMode}
         />
       );
     }
@@ -274,7 +289,7 @@ export default function App() {
         currentUser={displayUser}
         onNavigate={handleNavigate}
         theme={theme}
-        simulationMode={currentUser.role === 'test' && Boolean(previewRole)}
+        simulationMode={simulationMode}
       />
     );
   };
@@ -297,7 +312,8 @@ export default function App() {
         <NavigationTaskbar
           currentScreen={currentScreen}
           onNavigate={handleNavigate}
-          currentUser={currentUser}
+          currentUser={displayUser}
+          simulationMode={simulationMode}
           onLogout={() => { void handleLogout(); }}
           theme={theme}
           onToggleTheme={toggleTheme}
@@ -334,10 +350,11 @@ export default function App() {
             {currentScreen === 'test' && currentUser?.role === 'test' && <TestDashboardScreen theme={theme} />}
             {currentScreen === 'profile' && (
               <ProfileScreen
-                currentUser={currentUser}
+                currentUser={displayUser}
                 onUpdateCurrentUser={handleUpdateCurrentUser}
                 onNavigate={handleNavigate}
                 theme={theme}
+                simulationMode={simulationMode}
               />
             )}
             {(currentScreen === 'dashboard' || currentScreen === 'student-dashboard' || currentScreen === 'servant-dashboard') && (
