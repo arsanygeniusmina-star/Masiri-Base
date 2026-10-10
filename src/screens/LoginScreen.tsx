@@ -20,6 +20,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const cleanEmail = email.trim().toLowerCase();
@@ -112,6 +113,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </p>
         </div>
 
+        {successMsg && <div role="status" className="rounded-2xl border p-3.5 text-xs leading-relaxed" style={{ backgroundColor: theme === 'dark' ? 'rgba(32,53,42,.8)' : '#E9F4EC', color: theme === 'dark' ? '#75C695' : '#347653', borderColor: theme === 'dark' ? '#3A3540' : '#B8D7C1' }}>{successMsg}</div>}
+
         {/* Error notification */}
         {errorMsg && (
           <div
@@ -201,6 +204,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <p className="pt-1 text-center text-[11px]" style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
             ستظل جلسة الدخول محفوظة على هذا الجهاز حتى تسجيل الخروج.
           </p>
+
+          <button type="button" disabled={isLoading} onClick={async () => {
+            setErrorMsg('');
+            setSuccessMsg('');
+            if (!cleanEmail || !cleanEmail.includes('@')) {
+              setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة المرور.');
+              return;
+            }
+            setIsLoading(true);
+            const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: `${window.location.origin}/?password-reset=1` });
+            setIsLoading(false);
+            if (error) setErrorMsg('تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني.');
+            else setSuccessMsg('إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
+          }} className="w-full text-xs font-bold underline underline-offset-4" style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
+            نسيت كلمة المرور؟ إرسال رابط استعادة
+          </button>
 
           {/* Submit button with Church Burgundy & Gold in Dark Mode */}
           <button
