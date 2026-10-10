@@ -316,12 +316,17 @@ export default function App() {
       >
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-right">
           <div className="flex items-center gap-2">
-            <img src="/logo.jpg" alt="شعار مَسِيري" className="h-5 w-5 rounded-md border object-cover" />
+            <img src="/logo-family.jpg" alt="شعار مَسِيري" className="h-5 w-5 rounded-md border object-cover" />
             <span className="font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>مَسِيري</span>
             <span>·</span>
             <span>منصة خدمة المرحلة الإعدادية الكنسية</span>
           </div>
           <span className="text-[11px]">«لاَ يَمْنَعْكَ صِبَاكَ مِنْ أَنْ تَكُونَ قُدْوَةً لِلْمُؤْمِنِينَ» (١ تيموثاوس ٤: ١٢)</span>
+          <img
+            src={theme === 'dark' ? '/logo-church-dark.png' : '/logo-church-light.png'}
+            alt="شعار الكنيسة"
+            className="h-auto w-[170px] max-w-full object-contain"
+          />
           <span className="text-[11px]">جميع الحقوق محفوظة</span>
         </div>
       </footer>
