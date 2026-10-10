@@ -37,6 +37,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [gradeLevel, setGradeLevel] = useState<MiddleSchoolGrade>('grade-2');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [requiresEmailConfirmation, setRequiresEmailConfirmation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const cleanEmail = email.trim().toLowerCase();
@@ -49,6 +50,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    setRequiresEmailConfirmation(false);
 
     if (!name.trim()) {
       setErrorMsg('يرجى إدخال الاسم كاملاً.');
@@ -78,12 +80,16 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
       });
 
       if (error || !data.user) {
-        setErrorMsg(error?.message || 'تعذر إنشاء الحساب. تحقق من البيانات وحاول مرة أخرى.');
+        const reason = error?.message;
+        setErrorMsg(reason
+          ? `تعذر إنشاء الحساب: ${reason}`
+          : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.');
         return;
       }
 
       if (!data.session) {
-        setSuccessMsg('تم إنشاء الحساب. افتح رسالة التأكيد المرسلة إلى بريدك الإلكتروني، ثم ارجع وسجّل الدخول.');
+        setRequiresEmailConfirmation(true);
+        setSuccessMsg('تم إنشاء الحساب، لكن يلزم تأكيد البريد الإلكتروني أولاً. افتح رسالة التأكيد في بريدك، ثم ارجع إلى مسيري وسجّل الدخول. لن نفتح الملف الشخصي قبل اكتمال التحقق من الحساب.');
         return;
       }
 
@@ -97,7 +103,8 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
       onSignUpSuccess(profile);
     } catch (error) {
       console.error('Masiri sign-up failed:', error);
-      setErrorMsg('حدث خطأ أثناء إنشاء الحساب أو الاتصال بقاعدة البيانات. حاول مرة أخرى.');
+      const detail = error instanceof Error ? error.message : String(error);
+      setErrorMsg(`حدث خطأ أثناء إنشاء الحساب أو الاتصال بقاعدة البيانات: ${detail}`);
     } finally {
       setIsLoading(false);
     }
@@ -167,6 +174,27 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           </p>
         </div>
 
+        {/* Signup errors must be visible: previously the handler updated errorMsg but the
+            screen never rendered it, making failed requests look like an instant no-op. */}
+        {errorMsg && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="flex items-start gap-2.5 rounded-2xl border p-4 text-sm leading-relaxed"
+            style={{
+              backgroundColor: theme === 'dark' ? 'rgba(75, 28, 38, 0.72)' : '#FCEBEC',
+              color: theme === 'dark' ? '#FFB3B8' : '#912C3B',
+              borderColor: theme === 'dark' ? 'rgba(240, 128, 137, 0.42)' : '#E7B6BE',
+            }}
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-extrabold">لم يتم إنشاء الحساب</p>
+              <p className="mt-1 break-words">{errorMsg}</p>
+            </div>
+          </div>
+        )}
+
         {/* Success notification */}
         {successMsg && (
           <div
@@ -179,7 +207,22 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             }}
           >
             <ShieldCheck className="h-4 w-4 shrink-0" />
-            <span>{successMsg}</span>
+            <div className="min-w-0 flex-1">
+              <span>{successMsg}</span>
+              {requiresEmailConfirmation && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('login')}
+                  className="mt-3 block rounded-xl border px-3.5 py-2.5 font-bold underline underline-offset-2 transition hover:opacity-85"
+                  style={{
+                    borderColor: theme === 'dark' ? 'rgba(214,184,120,.45)' : '#B7D5BF',
+                    color: theme === 'dark' ? '#F3DEAB' : '#286844',
+                  }}
+                >
+                  الانتقال إلى شاشة تسجيل الدخول
+                </button>
+              )}
+            </div>
           </div>
         )}
 

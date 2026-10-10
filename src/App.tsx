@@ -30,6 +30,7 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => Database.getTheme());
   const [sessionReady, setSessionReady] = useState(false);
   const [journeyTransitionUser, setJourneyTransitionUser] = useState<User | null>(null);
+  const [journeyDestination, setJourneyDestination] = useState<AppScreen | null>(null);
 
   useEffect(() => {
     Database.setTheme(theme);
@@ -38,19 +39,22 @@ export default function App() {
   useEffect(() => {
     if (!journeyTransitionUser) return;
 
+    const destination = journeyDestination ?? authenticatedHomeFor(journeyTransitionUser);
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setCurrentScreen(authenticatedHomeFor(journeyTransitionUser));
+      setCurrentScreen(destination);
       setJourneyTransitionUser(null);
+      setJourneyDestination(null);
       return;
     }
 
     const transitionTimer = window.setTimeout(() => {
-      setCurrentScreen(authenticatedHomeFor(journeyTransitionUser));
+      setCurrentScreen(destination);
       setJourneyTransitionUser(null);
+      setJourneyDestination(null);
     }, 4300);
 
     return () => window.clearTimeout(transitionTimer);
-  }, [journeyTransitionUser]);
+  }, [journeyTransitionUser, journeyDestination]);
 
   useEffect(() => {
     if (currentUser?.role === 'test') startTestRuntimeLogCapture();
@@ -88,6 +92,7 @@ export default function App() {
             // Storage may be unavailable in restricted browser contexts; normal navigation still works.
           }
           if (animateAfterOAuth) {
+            setJourneyDestination(authenticatedHomeFor(profile));
             setJourneyTransitionUser(profile);
           } else {
             setCurrentScreen(authenticatedHomeFor(profile));
@@ -184,12 +189,15 @@ export default function App() {
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     setPreviewRole(null);
+    setJourneyDestination(authenticatedHomeFor(user));
     setJourneyTransitionUser(user);
   };
 
   const handleSignUpSuccess = (user: User) => {
     setCurrentUser(user);
     setPreviewRole(null);
+    // After registration, collect the user's remaining profile details first.
+    setJourneyDestination('profile');
     setJourneyTransitionUser(user);
   };
 
