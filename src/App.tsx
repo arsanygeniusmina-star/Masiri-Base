@@ -1,162 +1,220 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
-import { Database } from './db/storage';
-import { User } from './types';
-import { NavigationTaskbar, AppScreen } from './components/NavigationTaskbar';
+import { supabase, fetchUserProfile } from './lib/supabase';
+import type { User } from './types';
+import { NavigationTaskbar, type AppScreen } from './components/NavigationTaskbar';
 import { GetStartedScreen } from './screens/GetStartedScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { SignUpScreen } from './screens/SignUpScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { StudentDashboardScreen } from './screens/StudentDashboardScreen';
+import { ServantDashboardScreen } from './screens/ServantDashboardScreen';
+import { SupabaseScreen } from './screens/SupabaseScreen';
+import { Database } from './db/storage';
+
+const dashboardFor = (user: User): AppScreen =>
+  user.role === 'student' ? 'student-dashboard' : 'servant-dashboard';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => Database.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('get-started');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => Database.getTheme());
+  const [sessionReady, setSessionReady] = useState(false);
 
-  // Initialize theme class on root
   useEffect(() => {
     Database.setTheme(theme);
   }, [theme]);
 
-  // Purge lingering users except head, ensuring clean sign up requirement
   useEffect(() => {
-    const hasPurged = localStorage.getItem('maseery_purged_v3');
-    if (!hasPurged) {
-      Database.purgeAllUsersExceptHeadAndRequireSignUp();
-      setCurrentUser(null);
-      localStorage.setItem('maseery_purged_v3', 'true');
-    }
+    let active = true;
+
+    const hydrateSession = async (authUserId: string | null, navigateToDashboard = false) => {
+      if (!authUserId) {
+        if (active) {
+          setCurrentUser(null);
+          setSessionReady(true);
+        }
+        return;
+      }
+
+      try {
+        const profile = await fetchUserProfile(authUserId);
+        if (!active) return;
+        if (!profile) {
+          setCurrentUser(null);
+          setSessionReady(true);
+          return;
+        }
+        setCurrentUser(profile);
+        setSessionReady(true);
+        if (navigateToDashboard) setCurrentScreen(dashboardFor(profile));
+      } catch (error) {
+        console.error('Unable to load the authenticated Masiri profile:', error);
+        if (active) {
+          setCurrentUser(null);
+          setSessionReady(true);
+        }
+      }
+    };
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) console.error('Unable to restore Supabase session:', error);
+      void hydrateSession(data.session?.user.id ?? null, Boolean(data.session));
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Defer the profile query until Supabase has released its internal auth lock.
+      window.setTimeout(() => {
+        void hydrateSession(session?.user.id ?? null, Boolean(session));
+      }, 0);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    Database.setTheme(next);
+    setTheme((previous) => {
+      const next = previous === 'dark' ? 'light' : 'dark';
+      Database.setTheme(next);
+      return next;
+    });
   };
 
-  const handleLogout = () => {
-    Database.setCurrentUser(null);
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Unable to sign out:', error);
+      return;
+    }
     setCurrentUser(null);
     setCurrentScreen('get-started');
   };
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
-    setCurrentScreen('profile');
+    setCurrentScreen(dashboardFor(user));
   };
 
   const handleSignUpSuccess = (user: User) => {
     setCurrentUser(user);
-    setCurrentScreen('profile');
+    setCurrentScreen(dashboardFor(user));
+  };
+
+  const handleUpdateCurrentUser = (updated: User) => {
+    setCurrentUser(updated);
   };
 
   const handleNavigate = (screen: AppScreen) => {
+    if (screen === 'dashboard' || screen === 'student-dashboard' || screen === 'servant-dashboard') {
+      if (!currentUser) {
+        setCurrentScreen('login');
+        return;
+      }
+      setCurrentScreen(dashboardFor(currentUser));
+      return;
+    }
+    if (screen === 'supabase' && currentUser?.role !== 'head') return;
+    if (screen === 'profile' && !currentUser) {
+      setCurrentScreen('profile');
+      return;
+    }
     setCurrentScreen(screen);
+  };
+
+  const renderDashboard = () => {
+    if (!currentUser) return null;
+    if (currentUser.role === 'student') {
+      return (
+        <StudentDashboardScreen
+          currentUser={currentUser}
+          onUpdateUser={handleUpdateCurrentUser}
+          theme={theme}
+        />
+      );
+    }
+    return (
+      <ServantDashboardScreen
+        currentUser={currentUser}
+        onNavigate={handleNavigate}
+        theme={theme}
+      />
+    );
   };
 
   return (
     <div
-      className="min-h-screen flex flex-col relative overflow-x-hidden transition-colors selection:bg-[#F3E7EB] dark:selection:bg-[#38232C] selection:text-[#76243A] dark:selection:text-[#F3DEAB]"
+      className="relative flex min-h-screen flex-col overflow-x-clip transition-colors"
       style={{
         backgroundColor: theme === 'dark' ? '#141117' : '#FAF8F5',
         color: theme === 'dark' ? '#F5F1F0' : '#272329',
       }}
     >
-      {/* Super Liquid Glassmorphism Ambient Light Orbs (Deep Church Burgundy & Radiant Gold) */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Floating Orb 1: Church Burgundy */}
-        <div className="absolute -top-32 -right-24 w-[32rem] h-[32rem] rounded-full bg-[#76243A]/22 dark:bg-[#76243A]/30 blur-[110px] liquid-orb-burgundy" />
-        {/* Floating Orb 2: Radiant Church Gold */}
-        <div className="absolute top-1/3 -left-32 w-[34rem] h-[34rem] rounded-full bg-[#C5A15A]/20 dark:bg-[#D6B878]/18 blur-[120px] liquid-orb-gold" />
-        {/* Floating Orb 3: Deep Warm Rose/Amber */}
-        <div className="absolute -bottom-24 right-1/4 w-[28rem] h-[28rem] rounded-full bg-[#9B324D]/18 dark:bg-[#541424]/35 blur-[100px] liquid-orb-amber" />
-        {/* Subtle Liquid Caustic Sheen */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/[0.02] to-transparent dark:via-white/[0.01]" />
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div className="liquid-orb-burgundy absolute -right-24 -top-32 h-[32rem] w-[32rem] rounded-full bg-[#76243A]/20 blur-[110px] dark:bg-[#76243A]/28" />
+        <div className="liquid-orb-gold absolute -left-32 top-1/3 h-[34rem] w-[34rem] rounded-full bg-[#C5A15A]/18 blur-[120px] dark:bg-[#D6B878]/16" />
+        <div className="liquid-orb-amber absolute -bottom-24 right-1/4 h-[28rem] w-[28rem] rounded-full bg-[#9B324D]/14 blur-[100px] dark:bg-[#541424]/30" />
       </div>
 
-      {/* 1. Horizontal Taskbar Navigation (Only Welcome, Login, Signup, Profile) */}
       <div className="relative z-40">
         <NavigationTaskbar
           currentScreen={currentScreen}
           onNavigate={handleNavigate}
           currentUser={currentUser}
-          onLogout={handleLogout}
+          onLogout={() => { void handleLogout(); }}
           theme={theme}
           onToggleTheme={toggleTheme}
         />
       </div>
 
-      {/* 2. Main Content Screens (Strictly 4 screens: Welcome, Login, SignUp, Profile) */}
-      <main className="flex-1 pb-16 relative z-10">
-        {currentScreen === 'get-started' && (
-          <GetStartedScreen
-            onNavigate={handleNavigate}
-            currentUser={currentUser}
-            theme={theme}
-          />
-        )}
-
-        {currentScreen === 'login' && (
-          <LoginScreen
-            onLoginSuccess={handleLoginSuccess}
-            onNavigate={handleNavigate}
-            theme={theme}
-          />
-        )}
-
-        {currentScreen === 'signup' && (
-          <SignUpScreen
-            onSignUpSuccess={handleSignUpSuccess}
-            onNavigate={handleNavigate}
-            theme={theme}
-          />
-        )}
-
-        {currentScreen === 'profile' && (
-          <ProfileScreen
-            currentUser={currentUser}
-            onUpdateCurrentUser={(updated) => setCurrentUser(updated)}
-            onNavigate={handleNavigate}
-            theme={theme}
-          />
+      <main className="relative z-10 min-w-0 flex-1 pb-28 md:pb-8">
+        {!sessionReady ? (
+          <div className="flex min-h-[55vh] items-center justify-center px-6 text-sm" style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
+            جاري استعادة جلسة الدخول الآمنة...
+          </div>
+        ) : (
+          <>
+            {currentScreen === 'get-started' && (
+              <GetStartedScreen onNavigate={handleNavigate} currentUser={currentUser} theme={theme} />
+            )}
+            {currentScreen === 'login' && (
+              <LoginScreen onLoginSuccess={handleLoginSuccess} onNavigate={handleNavigate} theme={theme} />
+            )}
+            {currentScreen === 'signup' && (
+              <SignUpScreen onSignUpSuccess={handleSignUpSuccess} onNavigate={handleNavigate} theme={theme} />
+            )}
+            {currentScreen === 'profile' && (
+              <ProfileScreen
+                currentUser={currentUser}
+                onUpdateCurrentUser={handleUpdateCurrentUser}
+                onNavigate={handleNavigate}
+                theme={theme}
+              />
+            )}
+            {(currentScreen === 'dashboard' || currentScreen === 'student-dashboard' || currentScreen === 'servant-dashboard') && renderDashboard()}
+            {currentScreen === 'supabase' && currentUser?.role === 'head' && <SupabaseScreen theme={theme} />}
+          </>
         )}
       </main>
 
-      {/* 3. Quiet, Refined Ecclesiastical Footer */}
       <footer
-        className="border-t py-8 px-4 sm:px-6 lg:px-8 text-xs transition-colors"
+        className="relative z-10 hidden border-t px-4 py-8 text-xs transition-colors md:block sm:px-6 lg:px-8"
         style={{
           borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
           backgroundColor: theme === 'dark' ? '#211F25' : '#FFFFFF',
           color: theme === 'dark' ? '#B8B1BB' : '#77717A',
         }}
       >
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-right">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-right">
           <div className="flex items-center gap-2">
-            <img
-              src="/src/assets/images/maseery_app_logo_1791622420580.jpg"
-              alt="شعار مَسِيري"
-              className="w-5 h-5 rounded-md object-cover border"
-              style={{ borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.4)' : 'rgba(118, 36, 58, 0.25)' }}
-            />
-            <span className="font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-              مَسِيري
-            </span>
+            <img src="/logo.jpg" alt="شعار مَسِيري" className="h-5 w-5 rounded-md border object-cover" />
+            <span className="font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>مَسِيري</span>
             <span>·</span>
             <span>منصة خدمة المرحلة الإعدادية الكنسية</span>
           </div>
-
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>«لاَ يَمْنَعْكَ صِبَاكَ مِنْ أَنْ تَكُونَ قُدْوَةً لِلْمُؤْمِنِينَ» (١ تيموثاوس ٤ : ١٢)</span>
-          </div>
-
-          <div className="text-[11px]">
-            <span>جاهز للربط مع Supabase · جميع الحقوق محفوظة</span>
-          </div>
+          <span className="text-[11px]">«لاَ يَمْنَعْكَ صِبَاكَ مِنْ أَنْ تَكُونَ قُدْوَةً لِلْمُؤْمِنِينَ» (١ تيموثاوس ٤: ١٢)</span>
+          <span className="text-[11px]">جميع الحقوق محفوظة</span>
         </div>
       </footer>
     </div>

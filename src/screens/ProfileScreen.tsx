@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, MiddleSchoolGrade, TeacherWhitelistEntry } from '../types';
-import { Database, HEAD_EMAIL_DEFAULT } from '../db/storage';
+import { supabase, mapUserProfile } from '../lib/supabase';
 import {
   User as UserIcon,
   Mail,
@@ -32,79 +32,40 @@ interface ProfileScreenProps {
   theme: 'light' | 'dark';
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
+  if (!props.currentUser) {
+    return <ProfileSignInPrompt theme={props.theme} onNavigate={props.onNavigate} />;
+  }
+  return <ProfileScreenInner {...props} currentUser={props.currentUser} />;
+};
+
+const ProfileSignInPrompt: React.FC<Pick<ProfileScreenProps, 'theme' | 'onNavigate'>> = ({ theme, onNavigate }) => (
+  <div className="mx-auto flex min-h-[65vh] max-w-lg items-center justify-center px-4 py-8">
+    <div className="liquid-glass-card w-full space-y-5 rounded-3xl p-7 text-center sm:p-9">
+      <img src="/logo.jpg" alt="شعار مَسِيري" className="mx-auto h-16 w-16 rounded-2xl object-cover shadow-lg" />
+      <div className="space-y-2">
+        <h2 className="text-2xl font-black" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>الملف الشخصي والحساب</h2>
+        <p className="text-sm leading-relaxed" style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
+          سجّل الدخول أو أنشئ حساباً لعرض بياناتك ومتابعة رحلتك في خدمة إعدادي.
+        </p>
+      </div>
+      <div className="flex flex-col justify-center gap-3 sm:flex-row">
+        <button type="button" onClick={() => onNavigate('login')} className="church-btn-primary rounded-2xl px-6 py-3 text-sm font-bold">تسجيل الدخول</button>
+        <button type="button" onClick={() => onNavigate('signup')} className="rounded-2xl border px-6 py-3 text-sm font-bold" style={{ borderColor: '#C5A15A', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>إنشاء حساب جديد</button>
+      </div>
+    </div>
+  </div>
+);
+
+type ProfileScreenInnerProps = Omit<ProfileScreenProps, 'currentUser'> & { currentUser: User };
+
+const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
   currentUser,
   onUpdateCurrentUser,
   onNavigate,
   theme,
 }) => {
-  if (!currentUser) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-6 max-w-lg mx-auto">
-        <div
-          className="w-full p-8 rounded-3xl border liquid-glass-card shadow-2xl backdrop-blur-3xl space-y-6"
-          style={{
-            borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.25)' : 'rgba(223, 192, 202, 0.45)',
-          }}
-        >
-          <div
-            className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-lg"
-            style={{
-              background:
-                theme === 'dark'
-                  ? 'linear-gradient(135deg, #76243A 0%, #541424 100%)'
-                  : 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)',
-              border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.45)' : 'none',
-            }}
-          >
-            <UserIcon className="w-8 h-8 text-white dark:text-[#F3DEAB]" />
-          </div>
-
-          <div className="space-y-2">
-            <h2
-              className="text-2xl font-black"
-              style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
-            >
-              الملف الشخصي والحساب
-            </h2>
-            <p className="text-xs sm:text-sm text-[#77717A] dark:text-[#B8B1BB] leading-relaxed">
-              سجّل دخولك أو أنشئ حساباً جديداً لعرض بياناتك، ومتابعة درجات إعدادي، وإدارة الخدام لأمين الخدمة.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <button
-              onClick={() => onNavigate('login')}
-              className="w-full sm:w-auto px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 church-btn-primary"
-              style={{
-                background:
-                  theme === 'dark'
-                    ? 'linear-gradient(135deg, #76243A 0%, #541424 100%)'
-                    : 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)',
-                color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF',
-                border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.45)' : 'none',
-              }}
-            >
-              تسجيل الدخول
-            </button>
-            <button
-              onClick={() => onNavigate('signup')}
-              className="w-full sm:w-auto px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold border transition-transform hover:scale-105 active:scale-95"
-              style={{
-                borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.35)' : '#C5A15A',
-                color: theme === 'dark' ? '#F3DEAB' : '#76243A',
-                backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.6)' : '#FFFFFF',
-              }}
-            >
-              إنشاء حساب جديد
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const isHead = currentUser.role === 'head' || Database.isHeadEmail(currentUser.email);
+  const isHead = currentUser.role === 'head';
   const isTeacher = currentUser.role === 'teacher';
   const isStudent = currentUser.role === 'student';
 
@@ -114,9 +75,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [churchName, setChurchName] = useState(currentUser.churchName || 'كنيسة السيدة العذراء والشهيد مارمرقس');
   const [gradeLevel, setGradeLevel] = useState<MiddleSchoolGrade>(currentUser.gradeLevel || 'grade-2');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  const [saveErrorMsg, setSaveErrorMsg] = useState('');
 
   // Head Teacher Whitelist Management State
-  const [teachersList, setTeachersList] = useState<TeacherWhitelistEntry[]>(Database.getTeachersWhitelist());
+  const [teachersList, setTeachersList] = useState<TeacherWhitelistEntry[]>([]);
   const [newTeacherEmail, setNewTeacherEmail] = useState('');
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherGrade, setNewTeacherGrade] = useState<MiddleSchoolGrade>('grade-2');
@@ -130,69 +92,131 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   // Active Tab
   const [activeTab, setActiveTab] = useState<'profile' | 'teachers'>('profile');
 
-  // Handle Saving Profile
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updated: User = {
-      ...currentUser,
-      name: name.trim(),
-      phone: phone.trim() || undefined,
-      churchName: churchName.trim(),
-      gradeLevel: isStudent ? gradeLevel : currentUser.gradeLevel,
+  useEffect(() => {
+    let cancelled = false;
+    if (!isHead) return () => { cancelled = true; };
+
+    const loadTeachers = async () => {
+      const { data, error } = await supabase
+        .from('teachers_whitelist')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (cancelled) return;
+      if (error) {
+        setWhitelistFeedback({ type: 'error', message: 'تعذر تحميل قائمة الخدام من قاعدة البيانات.' });
+        return;
+      }
+
+      setTeachersList((data || []).map((row: any) => ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        assignedGrade: row.assigned_grade || undefined,
+        addedBy: row.added_by,
+        addedAt: row.created_at,
+        notes: row.notes || undefined,
+        status: row.status === 'active' ? 'active' : 'invited',
+      })));
     };
-    Database.saveUser(updated);
-    onUpdateCurrentUser(updated);
-    setSaveSuccessMsg('تم حفظ وتحديث بيانات الملف الشخصي بنجاح!');
-    setTimeout(() => setSaveSuccessMsg(''), 3000);
+
+    void loadTeachers();
+    return () => { cancelled = true; };
+  }, [isHead, currentUser.id]);
+
+  // Persist profile changes in Supabase; local storage is not the source of truth for account data.
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaveSuccessMsg('');
+    setSaveErrorMsg('');
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update({
+          name: name.trim(),
+          phone: phone.trim() || null,
+          church_name: churchName.trim(),
+        })
+        .eq('id', currentUser.id)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      const updated = mapUserProfile(data as any);
+      onUpdateCurrentUser(updated);
+      setSaveSuccessMsg('تم حفظ بيانات الملف الشخصي في قاعدة البيانات بنجاح.');
+    } catch (error) {
+      console.error('Unable to save Masiri profile:', error);
+      setSaveErrorMsg('تعذر حفظ البيانات. تحقق من اتصالك وصلاحيات الحساب ثم حاول مرة أخرى.');
+    }
   };
 
-  // Handle Adding Teacher (Exclusive to Head)
-  const handleAddTeacher = (e: React.FormEvent) => {
+  // Only the authenticated head account can manage this server-side whitelist.
+  const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setWhitelistFeedback(null);
 
     if (!isHead) {
+      setWhitelistFeedback({ type: 'error', message: 'هذه العملية متاحة لأمين الخدمة المعتمد فقط.' });
+      return;
+    }
+
+    const cleanTeacherEmail = newTeacherEmail.trim().toLowerCase();
+    if (!cleanTeacherEmail.includes('@')) {
+      setWhitelistFeedback({ type: 'error', message: 'يرجى إدخال بريد إلكتروني صالح.' });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('teachers_whitelist')
+      .insert({
+        email: cleanTeacherEmail,
+        name: newTeacherName.trim() || 'خادم جديد',
+        assigned_grade: newTeacherGrade,
+        added_by: currentUser.email,
+        notes: newTeacherNotes.trim() || null,
+        status: 'active',
+      })
+      .select('*')
+      .single();
+
+    if (error) {
       setWhitelistFeedback({
         type: 'error',
-        message: 'عفواً، لا يملك صلاحية إضافة المعلمين إلا أمين الخدمة العام (minasamehdeif@gmail.com).',
+        message: error.code === '23505' ? 'هذا البريد مسجل بالفعل في قائمة الخدام.' : 'تعذرت إضافة الخادم. تأكد أن حسابك لديه صلاحية أمين الخدمة.',
       });
       return;
     }
 
-    const result = Database.addTeacherEmail(
-      newTeacherEmail,
-      newTeacherName,
-      currentUser.email,
-      newTeacherGrade,
-      newTeacherNotes
-    );
-
-    if (result.success) {
-      setTeachersList(Database.getTeachersWhitelist());
-      setNewTeacherEmail('');
-      setNewTeacherName('');
-      setNewTeacherNotes('');
-      setWhitelistFeedback({
-        type: 'success',
-        message: `${result.message} بمجرد أن يسجل الخادم بهذا الإيميل سيدخل تلقائياً بدور المعلم.`,
-      });
-      setIsQuickAddModalOpen(false);
-    } else {
-      setWhitelistFeedback({ type: 'error', message: result.message });
-    }
+    const newEntry: TeacherWhitelistEntry = {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      assignedGrade: data.assigned_grade || undefined,
+      addedBy: data.added_by,
+      addedAt: data.created_at,
+      notes: data.notes || undefined,
+      status: data.status === 'active' ? 'active' : 'invited',
+    };
+    setTeachersList((previous) => [newEntry, ...previous]);
+    setNewTeacherEmail('');
+    setNewTeacherName('');
+    setNewTeacherNotes('');
+    setWhitelistFeedback({ type: 'success', message: 'تم حفظ الخادم المعتمد في قاعدة البيانات. سيُحدد دوره عند إنشاء حسابه.' });
+    setIsQuickAddModalOpen(false);
   };
 
-  // Handle Removing Teacher
-  const handleRemoveTeacher = (id: string, teacherName: string) => {
-    if (!window.confirm(`هل أنت متأكد من إلغاء اعتماد الخادم (${teacherName})؟`)) return;
+  const handleRemoveTeacher = async (id: string, teacherName: string) => {
+    if (!isHead || !window.confirm(`هل أنت متأكد من إلغاء اعتماد الخادم (${teacherName})؟`)) return;
 
-    const res = Database.removeTeacherEmail(id, currentUser.email);
-    if (res.success) {
-      setTeachersList(Database.getTeachersWhitelist());
-      setWhitelistFeedback({ type: 'success', message: `تم إزالة ${teacherName} بنجاح.` });
-    } else {
-      setWhitelistFeedback({ type: 'error', message: res.message });
+    const { error } = await supabase.from('teachers_whitelist').delete().eq('id', id);
+    if (error) {
+      setWhitelistFeedback({ type: 'error', message: 'تعذر إلغاء اعتماد الخادم. تحقق من صلاحيات أمين الخدمة.' });
+      return;
     }
+    setTeachersList((previous) => previous.filter((teacher) => teacher.id !== id));
+    setWhitelistFeedback({ type: 'success', message: `تم إلغاء اعتماد ${teacherName} من قاعدة البيانات.` });
   };
 
   return (
@@ -219,7 +243,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           >
             {isHead ? (
               <img
-                src="/src/assets/images/maseery_app_logo_1791622420580.jpg"
+                src="/logo.jpg"
                 alt="شعار الخدمة"
                 className="w-full h-full object-cover"
               />
@@ -430,6 +454,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </p>
               </div>
 
+              {saveErrorMsg && (
+                <div role="alert" className="flex items-center gap-2 rounded-2xl border p-3.5 text-xs"
+                  style={{ backgroundColor: theme === 'dark' ? 'rgba(61,36,42,.75)' : '#F9E9EB', color: theme === 'dark' ? '#F08089' : '#B33B49', borderColor: theme === 'dark' ? '#69404D' : '#DFC0CA' }}>
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{saveErrorMsg}</span>
+                </div>
+              )}
+
               {saveSuccessMsg && (
                 <div
                   className="p-3.5 rounded-2xl text-xs flex items-center gap-2"
@@ -508,6 +540,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     </label>
                     <select
                       value={gradeLevel}
+                      disabled
+                      aria-describedby="grade-level-help"
                       onChange={(e) => setGradeLevel(e.target.value as MiddleSchoolGrade)}
                       className="w-full px-3.5 py-2.5 rounded-2xl text-sm border focus:outline-none focus:ring-2 focus:ring-[#76243A] backdrop-blur-md"
                       style={{
@@ -520,6 +554,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       <option value="grade-2">الصف الثامن (تانية إعدادي / 8th Grade)</option>
                       <option value="grade-3">الصف التاسع (تالتة إعدادي / 9th Grade)</option>
                     </select>
+                    <p id="grade-level-help" className="text-[11px] text-[#77717A] dark:text-[#B8B1BB]">يتم تحديد المرحلة الدراسية من بيانات التسجيل واعتماد الخدمة.</p>
                   </div>
                 )}
 
@@ -654,7 +689,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <p className="text-sm leading-relaxed text-[#77717A] dark:text-[#B8B1BB]">
                 الخادم الفصلي يمتلك كل أدوات إدارة ومتابعة الطلاب تماماً كأمين الخدمة، إلا أنه{' '}
                 <strong className="text-[#76243A] dark:text-[#B65370]">لا يستطيع إضافة خدام آخرين</strong>. فقط أمين الخدمة العام (
-                <span className="font-mono font-bold" dir="ltr">{HEAD_EMAIL_DEFAULT}</span>) يملك حق إضافة واعتماد المعلمين الجدد.
+                <span className="font-mono font-bold" dir="ltr">أمين الخدمة العام</span>) يملك حق إضافة واعتماد المعلمين الجدد.
               </p>
             </div>
           ) : (
