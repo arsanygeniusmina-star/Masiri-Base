@@ -77,6 +77,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
         { id: 'dashboard', label: 'رحلتي', icon: LayoutDashboard },
         { id: 'profile', label: 'حسابي', icon: UserIcon },
         ...(isHead ? [{ id: 'supabase' as const, label: 'البيانات', icon: Database }] : []),
+        ...(isTest ? [{ id: 'test' as const, label: 'اختبار', icon: Database }] : []),
         { id: 'logout', label: 'خروج', icon: LogOut, action: 'logout' },
       ]
     : [
