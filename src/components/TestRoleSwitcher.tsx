@@ -35,7 +35,7 @@ export const TestRoleSwitcher: React.FC<TestRoleSwitcherProps> = ({ activeRole, 
             <span className="rounded-full border px-2 py-0.5 text-[10px] font-black" style={{ borderColor: border, color: selected }}>TEST</span>
           </div>
           <p className="mt-1 text-[11px] leading-5" style={{ color: dark ? '#B8B1BB' : '#77717A' }}>
-            تبديل واجهة للمعاينة فقط — هوية TEST وصلاحيات قاعدة البيانات لا تتغير، والعمليات المعدِّلة محظورة.
+            اختر دوراً لتجربة الواجهة تفاعلياً. التغييرات داخل وضع المحاكاة محلية فقط ولا تُكتب إلى قاعدة البيانات أو حسابات حقيقية.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
