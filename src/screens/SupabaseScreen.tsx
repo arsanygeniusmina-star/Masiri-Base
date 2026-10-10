@@ -1,336 +1,149 @@
-import React, { useState } from 'react';
-import { Database } from '../db/storage';
-import { SupabaseConfig } from '../types';
-import { testSupabaseConnection } from '../lib/supabase';
-import {
-  Database as DbIcon,
-  Copy,
-  Check,
-  Download,
-  Link,
-  ShieldCheck,
-  Server,
-  Table,
-  CheckCircle2,
-  AlertCircle,
-  Code2,
-} from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Activity, CheckCircle2, RefreshCw, AlertCircle, Database, ShieldCheck, Users, BookOpen, HeartHandshake, ListChecks } from 'lucide-react';
+import { supabase, testSupabaseConnection } from '../lib/supabase';
 
 interface SupabaseScreenProps {
   theme: 'light' | 'dark';
 }
 
+type TableStatus = {
+  key: string;
+  label: string;
+  description: string;
+  count: number | null;
+  error?: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+const initialTables: TableStatus[] = [
+  { key: 'users', label: 'حسابات المستخدمين', description: 'الملفات الشخصية والأدوار', count: null, icon: Users },
+  { key: 'teachers_whitelist', label: 'الخدام المعتمدون', description: 'قائمة اعتماد الخدام التي يديرها أمين الخدمة', count: null, icon: ShieldCheck },
+  { key: 'daily_tasks', label: 'المهام الروحية', description: 'المهام اليومية المشتركة', count: null, icon: BookOpen },
+  { key: 'student_daily_logs', label: 'إنجازات الطلاب', description: 'حالة إنجاز المهام والنقاط', count: null, icon: ListChecks },
+  { key: 'prayer_requests', label: 'طلبات الصلاة', description: 'الطلبات وحالتها مع احترام سياسات الخصوصية', count: null, icon: HeartHandshake },
+];
+
 export const SupabaseScreen: React.FC<SupabaseScreenProps> = ({ theme }) => {
-  const [config, setConfig] = useState<SupabaseConfig>(Database.getSupabaseConfig());
-  const [url, setUrl] = useState(config.url);
-  const [anonKey, setAnonKey] = useState(config.anonKey);
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [copiedSQL, setCopiedSQL] = useState(false);
+  const [tables, setTables] = useState<TableStatus[]>(initialTables);
+  const [isLoading, setIsLoading] = useState(false);
+  const [connectionMessage, setConnectionMessage] = useState('');
+  const [hasError, setHasError] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  const sqlSchema = Database.generateSupabaseSQLSchema();
-
-  const handleCopySQL = () => {
-    navigator.clipboard.writeText(sqlSchema);
-    setCopiedSQL(true);
-    setTimeout(() => setCopiedSQL(false), 2500);
-  };
-
-  const handleDownloadSQL = () => {
-    const element = document.createElement('a');
-    const file = new Blob([sqlSchema], { type: 'text/plain;charset=utf-8' });
-    element.href = URL.createObjectURL(file);
-    element.download = 'maseery_supabase_schema.sql';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
-
-  const handleSaveAndTest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsTesting(true);
-    setTestResult(null);
-
-    const cleanUrl = url.trim();
-    const cleanKey = anonKey.trim();
-
-    if (!cleanUrl || !cleanKey) {
-      setIsTesting(false);
-      setTestResult({
-        success: false,
-        message: 'يرجى إدخال رابط مشروع Supabase ومفتاح Anon API المفتاح العام.',
-      });
-      return;
-    }
-
+  const runDiagnostics = useCallback(async () => {
+    setIsLoading(true);
+    setHasError(false);
+    setConnectionMessage('');
     try {
-      const res = await testSupabaseConnection();
-      setIsTesting(false);
+      const [connection, ...results] = await Promise.all([
+        testSupabaseConnection(),
+        supabase.from('users').select('id', { count: 'exact', head: true }),
+        supabase.from('teachers_whitelist').select('id', { count: 'exact', head: true }),
+        supabase.from('daily_tasks').select('id', { count: 'exact', head: true }),
+        supabase.from('student_daily_logs').select('id', { count: 'exact', head: true }),
+        supabase.from('prayer_requests').select('id', { count: 'exact', head: true }),
+      ]);
 
-      const updatedConfig: SupabaseConfig = {
-        url: cleanUrl,
-        anonKey: cleanKey,
-        isConnected: res.connected,
-        lastSync: new Date().toISOString(),
-        autoSync: true,
-      };
-
-      Database.saveSupabaseConfig(updatedConfig);
-      setConfig(updatedConfig);
-      setTestResult({
-        success: res.connected,
-        message: res.message,
+      const nextTables = initialTables.map((table, index) => {
+        const result = results[index] as { count: number | null; error: { message: string } | null };
+        return {
+          ...table,
+          count: result.error ? null : result.count ?? 0,
+          error: result.error?.message,
+        };
       });
-    } catch (err: any) {
-      setIsTesting(false);
-      setTestResult({
-        success: false,
-        message: err?.message || 'تعذر فحص الاتصال.',
-      });
+      setTables(nextTables);
+      const failed = nextTables.some((table) => Boolean(table.error)) || !connection.connected || !connection.hasTables;
+      setHasError(failed);
+      setConnectionMessage(
+        failed
+          ? 'تم الاتصال جزئياً، لكن بعض الجداول أو الصلاحيات لم تجتز الفحص. راجع التفاصيل أدناه.'
+          : 'الاتصال ناجح، والجداول الخمسة متاحة لهذا الحساب وفقاً لصلاحيات قاعدة البيانات.'
+      );
+      setLastChecked(new Date());
+    } catch (error) {
+      console.error('Supabase diagnostics failed:', error);
+      setHasError(true);
+      setConnectionMessage('تعذر إكمال فحص Supabase. تحقق من الاتصال أو إعدادات المشروع.');
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void runDiagnostics();
+  }, [runDiagnostics]);
+
+  const primary = theme === 'dark' ? '#F5F1F0' : '#272329';
+  const secondary = theme === 'dark' ? '#B8B1BB' : '#77717A';
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* Header Banner - Liquid Glassmorphism */}
-      <div
-        className="rounded-3xl border p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 liquid-glass-card backdrop-blur-3xl"
-      >
-        <div className="space-y-2 text-right">
-          <div className="flex items-center gap-2">
-            <span
-              className="text-xs font-semibold px-2.5 py-0.5 rounded-md"
-              style={{
-                backgroundColor: theme === 'dark' ? '#342D20' : '#F6F0E3',
-                color: theme === 'dark' ? '#D6B878' : '#A96F19',
-              }}
-            >
-              جاهز للربط مع Supabase
-            </span>
-            <span className="text-xs text-[#77717A] dark:text-[#B8B1BB]">·</span>
-            <span className="text-xs text-[#77717A] dark:text-[#B8B1BB]">PostgreSQL + Row Level Security</span>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-            مركز إعداد وقاعدة بيانات Supabase
-          </h1>
-          <p className="text-xs sm:text-sm text-[#77717A] dark:text-[#B8B1BB] max-w-xl">
-            تطبيق «مسيري» يعمل الآن بقاعدة بيانات محلية نشطة متوافقة 100% مع مخطط Supabase. يمكنك تصدير ملف الـ SQL وإنشاء الجداول على مشروعك بضغطة واحدة.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleCopySQL}
-            className="px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm hover:opacity-95 church-btn-primary"
-            style={{
-              background:
-                theme === 'dark'
-                  ? 'linear-gradient(135deg, #76243A 0%, #541424 100%)'
-                  : 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)',
-              color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF',
-              border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.45)' : 'none',
-            }}
-          >
-            {copiedSQL ? (
-              <Check className="w-4 h-4" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
-            ) : (
-              <Copy className="w-4 h-4" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
-            )}
-            <span>{copiedSQL ? 'تم نسخ كود SQL!' : 'نسخ كود إنشاء الجداول SQL'}</span>
-          </button>
-
-          <button
-            onClick={handleDownloadSQL}
-            className="px-3.5 py-2.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5"
-            style={{
-              borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
-              color: theme === 'dark' ? '#F5F1F0' : '#272329',
-              backgroundColor: theme === 'dark' ? '#2A2730' : '#F2F0ED',
-            }}
-          >
-            <Download className="w-4 h-4" />
-            <span>تحميل schema.sql</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Supabase Connection Credentials Form */}
-        <div className="lg:col-span-5 space-y-6">
-          <div
-            className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right liquid-glass-card backdrop-blur-3xl"
-          >
-            <div className="border-b pb-3" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
-              <h2 className="text-base font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                ربط مشروع Supabase الخاص بك
-              </h2>
-              <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] mt-0.5">
-                أدخل مفاتيح مشروعك من Supabase Dashboard &gt; Project Settings &gt; API
-              </p>
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <section className="liquid-glass-card space-y-5 rounded-3xl p-5 sm:p-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold" style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
+              <Database className="h-4 w-4" />
+              <span>مركز فحص قاعدة البيانات</span>
             </div>
-
-            {testResult && (
-              <div
-                className="p-3.5 rounded-xl border text-xs flex items-center gap-2"
-                style={{
-                  backgroundColor: testResult.success
-                    ? theme === 'dark'
-                      ? '#20352A'
-                      : '#E9F4EC'
-                    : theme === 'dark'
-                    ? '#3D242A'
-                    : '#F9E9EB',
-                  color: testResult.success
-                    ? theme === 'dark'
-                      ? '#75C695'
-                      : '#347653'
-                    : theme === 'dark'
-                    ? '#F08089'
-                    : '#B33B49',
-                  borderColor: testResult.success
-                    ? theme === 'dark'
-                      ? '#3A3540'
-                      : '#DFC0CA'
-                    : theme === 'dark'
-                    ? '#69404D'
-                    : '#DFC0CA',
-                }}
-              >
-                {testResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                )}
-                <span>{testResult.message}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveAndTest} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                  Project URL رابط المشروع:
-                </label>
-                <input
-                  type="url"
-                  dir="ltr"
-                  placeholder="https://xyzabcdefg.supabase.co"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-[#76243A]"
-                  style={{
-                    backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
-                    borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
-                    color: theme === 'dark' ? '#F5F1F0' : '#272329',
-                  }}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                  Anon Public API Key المفتاح العام:
-                </label>
-                <input
-                  type="password"
-                  dir="ltr"
-                  placeholder="eyJh......"
-                  value={anonKey}
-                  onChange={(e) => setAnonKey(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-xs border focus:outline-none focus:ring-1 focus:ring-[#76243A]"
-                  style={{
-                    backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
-                    borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
-                    color: theme === 'dark' ? '#F5F1F0' : '#272329',
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isTesting}
-                className="w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95 church-btn-primary"
-                style={{
-                  background:
-                    theme === 'dark'
-                      ? 'linear-gradient(135deg, #76243A 0%, #541424 100%)'
-                      : 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)',
-                  color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF',
-                  border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.45)' : 'none',
-                }}
-              >
-                <Link className="w-3.5 h-3.5" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
-                <span>{isTesting ? 'جاري فحص الاتصال...' : 'حفظ واختبار الاتصال مع Supabase'}</span>
-              </button>
-            </form>
-          </div>
-
-          {/* Database Tables Overview */}
-          <div
-            className="rounded-3xl border p-6 sm:p-7 space-y-3 text-right liquid-glass-card backdrop-blur-3xl"
-          >
-            <h3 className="text-sm font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-              جداول قاعدة بيانات «مسيري»:
-            </h3>
-            <ul className="text-xs space-y-2 text-[#77717A] dark:text-[#B8B1BB]">
-              <li className="flex items-center justify-between p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                <span className="font-mono" dir="ltr">public.users</span>
-                <span>بيانات الحسابات والأدوار الـ 3 (Head, Teacher, Student)</span>
-              </li>
-              <li className="flex items-center justify-between p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                <span className="font-mono" dir="ltr">public.teachers_whitelist</span>
-                <span>قائمة الخدام المعتمدين حصرياً من أمين الخدمة</span>
-              </li>
-              <li className="flex items-center justify-between p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                <span className="font-mono" dir="ltr">public.daily_tasks</span>
-                <span>المهام الروحية لطلاب إعدادي (الأجبية، الإنجيل)</span>
-              </li>
-              <li className="flex items-center justify-between p-2 rounded-lg bg-black/5 dark:bg-white/5">
-                <span className="font-mono" dir="ltr">public.prayer_requests</span>
-                <span>صندوق طلبات الصلاة والأسئلة الخاصة بالخدام</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Right Column: SQL Migration Code Viewer */}
-        <div className="lg:col-span-7 space-y-4">
-          <div
-            className="rounded-2xl border p-6 space-y-4 text-right"
-            style={{
-              backgroundColor: theme === 'dark' ? '#211F25' : '#FFFFFF',
-              borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
-            }}
-          >
-            <div className="flex items-center justify-between border-b pb-3">
-              <span className="text-xs font-mono text-[#77717A] dark:text-[#B8B1BB]">
-                PostgreSQL DDL + RLS Policies
-              </span>
-              <div className="flex items-center gap-1.5">
-                <Code2 className="w-4 h-4 text-[#76243A] dark:text-[#B65370]" />
-                <h2 className="text-base font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                  سكربت إنشاء الجداول (SQL Script)
-                </h2>
-              </div>
-            </div>
-
-            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB]">
-              انسخ هذا السكربت والصقه في <strong>SQL Editor</strong> داخل لوحة تحكم مشروع Supabase لإنشاء كافة الجداول وقواعد الأمان (RLS) فوراً.
+            <h1 className="text-2xl font-black sm:text-3xl" style={{ color: primary }}>اتصال مسيري بـ Supabase</h1>
+            <p className="max-w-2xl text-sm leading-relaxed" style={{ color: secondary }}>
+              فحص مباشر للاتصال والجداول المتاحة لهذا الحساب. لا يتم عرض مفاتيح سرية أو إنشاء جداول مكررة من المتصفح.
             </p>
-
-            <div
-              className="rounded-xl border p-4 text-xs font-mono overflow-x-auto max-h-[460px] text-left"
-              dir="ltr"
-              style={{
-                backgroundColor: theme === 'dark' ? '#161419' : '#F8F7F4',
-                borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
-                color: theme === 'dark' ? '#F5F1F0' : '#272329',
-              }}
-            >
-              <pre className="whitespace-pre">{sqlSchema}</pre>
-            </div>
           </div>
+          <button type="button" onClick={() => { void runDiagnostics(); }} disabled={isLoading}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg,#76243A 0%,#541424 100%)', color: '#F3DEAB', border: '1px solid rgba(214,184,120,.4)' }}>
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'جارٍ الفحص...' : 'إعادة فحص الاتصال'}
+          </button>
         </div>
-      </div>
+
+        {connectionMessage && (
+          <div role={hasError ? 'alert' : 'status'} className="flex items-start gap-2 rounded-2xl border p-4 text-sm"
+            style={{
+              backgroundColor: hasError ? (theme === 'dark' ? 'rgba(61,36,42,.7)' : '#F9E9EB') : (theme === 'dark' ? 'rgba(32,53,42,.7)' : '#E9F4EC'),
+              borderColor: hasError ? '#B33B49' : '#347653',
+              color: hasError ? (theme === 'dark' ? '#F08089' : '#B33B49') : (theme === 'dark' ? '#75C695' : '#347653'),
+            }}>
+            {hasError ? <AlertCircle className="h-5 w-5 shrink-0" /> : <CheckCircle2 className="h-5 w-5 shrink-0" />}
+            <span>{connectionMessage}</span>
+          </div>
+        )}
+        {lastChecked && <p className="text-xs" style={{ color: secondary }}>آخر فحص: {lastChecked.toLocaleString('ar-EG')}</p>}
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {tables.map((table) => {
+          const Icon = table.icon;
+          return (
+            <article key={table.key} className="liquid-glass-card flex min-w-0 items-start gap-3 rounded-2xl p-4 sm:p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                style={{ backgroundColor: theme === 'dark' ? 'rgba(118,36,58,.3)' : '#F3E7EB', color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-bold" style={{ color: primary }}>{table.label}</h2>
+                  <span className="rounded-lg px-2 py-1 text-xs font-bold" style={{
+                    backgroundColor: table.error ? (theme === 'dark' ? 'rgba(61,36,42,.75)' : '#F9E9EB') : (theme === 'dark' ? 'rgba(32,53,42,.7)' : '#E9F4EC'),
+                    color: table.error ? (theme === 'dark' ? '#F08089' : '#B33B49') : (theme === 'dark' ? '#75C695' : '#347653'),
+                  }}>
+                    {table.count === null ? 'غير متاح' : `${table.count} سجل`}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: secondary }}>{table.description}</p>
+                {table.error && <p className="break-words text-xs" style={{ color: theme === 'dark' ? '#F08089' : '#B33B49' }}>{table.error}</p>}
+                <code className="block text-[11px]" dir="ltr" style={{ color: secondary }}>public.{table.key}</code>
+              </div>
+            </article>
+          );
+        })}
+      </section>
+
+      <p className="text-xs leading-relaxed" style={{ color: secondary }}>
+        ملاحظة: عدد السجلات الظاهر يطابق ما تسمح به سياسات RLS لهذا الحساب، وليس بالضرورة العدد الإجمالي المرئي لمسؤول قاعدة البيانات.
+      </p>
     </div>
   );
 };
