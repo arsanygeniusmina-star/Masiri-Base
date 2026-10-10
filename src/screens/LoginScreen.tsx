@@ -25,6 +25,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const cleanEmail = email.trim().toLowerCase();
 
+  const handleGoogleSignIn = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) {
+      setErrorMsg('تسجيل الدخول بجوجل غير مُفعّل بعد. يلزم إعداد Google OAuth في لوحة Supabase أولاً.');
+      setIsLoading(false);
+    }
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -255,6 +269,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             )}
           </button>
         </form>
+
+        <button type="button" onClick={() => void handleGoogleSignIn()} disabled={isLoading}
+          className="mt-4 w-full rounded-2xl border px-5 py-3.5 text-sm font-bold transition-all hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+          style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.35)' : 'rgba(118,36,58,.2)', color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+          <span className="inline-flex items-center justify-center gap-2"><span className="font-black text-base">G</span> المتابعة باستخدام Google</span>
+        </button>
 
         {/* Footer Link to Signup */}
         <div
