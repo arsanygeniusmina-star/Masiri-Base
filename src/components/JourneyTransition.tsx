@@ -13,7 +13,7 @@ export const JourneyTransition: React.FC<JourneyTransitionProps> = ({ theme }) =
   >
     <img
       className="journey-transition__scene"
-      src="/masiri-journey-icon-v2.jpg?v=20261010-3"
+      src="/masiri-journey-icon.jpg?v=20261010-2"
       alt=""
       draggable={false}
     />
