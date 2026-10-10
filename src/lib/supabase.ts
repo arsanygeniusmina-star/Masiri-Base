@@ -34,7 +34,7 @@ type UserProfileRow = {
   created_at?: string | null;
 };
 
-const validRoles: UserRole[] = ['head', 'teacher', 'student'];
+const validRoles: UserRole[] = ['head', 'teacher', 'student', 'test'];
 const validGrades: MiddleSchoolGrade[] = ['grade-1', 'grade-2', 'grade-3'];
 
 export function mapUserProfile(row: UserProfileRow): User {
