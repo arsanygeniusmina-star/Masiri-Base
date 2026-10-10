@@ -51,6 +51,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
 }) => {
   const isHead = currentUser?.role === 'head';
   const isTeacher = currentUser?.role === 'teacher';
+  const isTest = currentUser?.role === 'test';
   const isDashboard = currentScreen === 'dashboard' ||
     currentScreen === 'student-dashboard' ||
     currentScreen === 'servant-dashboard';
