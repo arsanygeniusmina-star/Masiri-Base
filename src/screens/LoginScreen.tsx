@@ -108,7 +108,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             }}
           >
             <img
-              src="/logo.jpg"
+              src="/logo-family.jpg"
               alt="شعار مَسِيري"
               className="w-full h-full object-cover"
             />
