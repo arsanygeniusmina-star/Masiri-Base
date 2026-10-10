@@ -288,3 +288,24 @@
   animation: spinnerRotate 0.85s linear infinite;
 }
 
+
+
+/* Accessibility: preserve the visual identity while respecting reduced-motion settings. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Avoid content being hidden behind the fixed bottom taskbar on short mobile screens. */
+@media (max-width: 767px) {
+  #root main {
+    min-width: 0;
+    padding-bottom: max(7rem, calc(env(safe-area-inset-bottom) + 6.5rem));
+  }
+}
