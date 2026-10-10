@@ -66,6 +66,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
         ]
       : [{ id: 'profile' as const, label: 'حسابي', icon: UserIcon }]),
     ...(isHead ? [{ id: 'supabase' as const, label: 'قاعدة البيانات', icon: Database }] : []),
+    ...(isTest ? [{ id: 'test' as const, label: 'مركز الاختبار', icon: Database }] : []),
   ];
 
   // The phone taskbar is deliberately compact. Session controls stay reachable
