@@ -4,6 +4,7 @@ import type { User } from './types';
 import { NavigationTaskbar, type AppScreen } from './components/NavigationTaskbar';
 import { GetStartedScreen } from './screens/GetStartedScreen';
 import { LoginScreen } from './screens/LoginScreen';
+import { PasswordRecoveryScreen } from './screens/PasswordRecoveryScreen';
 import { SignUpScreen } from './screens/SignUpScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { StudentDashboardScreen } from './screens/StudentDashboardScreen';
@@ -17,6 +18,7 @@ const dashboardFor = (user: User): AppScreen =>
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('get-started');
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => window.location.search.includes('password-reset=1'));
   const [theme, setTheme] = useState<'light' | 'dark'>(() => Database.getTheme());
   const [sessionReady, setSessionReady] = useState(false);
 
@@ -207,6 +209,13 @@ export default function App() {
           <div className="flex min-h-[55vh] items-center justify-center px-6 text-sm" style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
             جاري استعادة جلسة الدخول الآمنة...
           </div>
+        ) : isPasswordRecovery ? (
+          <PasswordRecoveryScreen theme={theme} onComplete={() => {
+            setIsPasswordRecovery(false);
+            setCurrentUser(null);
+            setCurrentScreen('login');
+            window.history.replaceState({}, '', window.location.pathname);
+          }} />
         ) : (
           <>
             {currentScreen === 'get-started' && (
