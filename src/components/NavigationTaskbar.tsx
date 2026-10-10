@@ -4,15 +4,25 @@ import {
   LogIn,
   UserPlus,
   User as UserIcon,
-  ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Moon,
   Sun,
   LogOut,
+  LayoutDashboard,
+  Database,
 } from 'lucide-react';
-import { User } from '../types';
+import type { User } from '../types';
 
-export type AppScreen = 'get-started' | 'login' | 'signup' | 'profile';
+export type AppScreen =
+  | 'get-started'
+  | 'login'
+  | 'signup'
+  | 'profile'
+  | 'dashboard'
+  | 'student-dashboard'
+  | 'servant-dashboard'
+  | 'supabase';
 
 interface NavigationTaskbarProps {
   currentScreen: AppScreen;
@@ -22,6 +32,13 @@ interface NavigationTaskbarProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
 }
+
+type NavigationItem = {
+  id: AppScreen | 'logout';
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  action?: 'logout';
+};
 
 export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
   currentScreen,
@@ -33,236 +50,207 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
 }) => {
   const isHead = currentUser?.role === 'head';
   const isTeacher = currentUser?.role === 'teacher';
+  const isDashboard = currentScreen === 'dashboard' ||
+    currentScreen === 'student-dashboard' ||
+    currentScreen === 'servant-dashboard';
 
-  // Only the 4 requested screens: welcome, login, signup, profile
-  const navItems = [
-    {
-      id: 'get-started' as const,
-      label: 'الترحيب',
-      icon: Compass,
-      description: 'شاشة البداية والترحيب الكنسي',
-    },
-    {
-      id: 'login' as const,
-      label: 'تسجيل الدخول',
-      icon: LogIn,
-      description: 'دخول الخدام والطلاب',
-    },
-    {
-      id: 'signup' as const,
-      label: 'إنشاء حساب',
-      icon: UserPlus,
-      description: 'تسجيل حساب جديد بالخدمة',
-    },
-    {
-      id: 'profile' as const,
-      label: 'الملف الشخصي',
-      icon: UserIcon,
-      description: 'بيانات الحساب وإدارة الخدام',
-    },
+  const desktopItems: NavigationItem[] = [
+    { id: 'get-started', label: 'الرئيسية', icon: Compass },
+    ...(currentUser ? [{ id: 'dashboard' as const, label: 'لوحة الرحلة', icon: LayoutDashboard }] : []),
+    ...(!currentUser
+      ? [
+          { id: 'login' as const, label: 'تسجيل الدخول', icon: LogIn },
+          { id: 'signup' as const, label: 'إنشاء حساب', icon: UserPlus },
+        ]
+      : [{ id: 'profile' as const, label: 'حسابي', icon: UserIcon }]),
+    ...(isHead ? [{ id: 'supabase' as const, label: 'قاعدة البيانات', icon: Database }] : []),
   ];
 
-  return (
-    <header
-      className="sticky top-0 z-40 w-full transition-all backdrop-blur-3xl"
+  // The phone taskbar is deliberately compact. Session controls stay reachable
+  // without squeezing desktop navigation into a tiny horizontal strip.
+  const mobileItems: NavigationItem[] = currentUser
+    ? [
+        { id: 'get-started', label: 'الرئيسية', icon: Compass },
+        { id: 'dashboard', label: 'رحلتي', icon: LayoutDashboard },
+        { id: 'profile', label: 'حسابي', icon: UserIcon },
+        { id: 'logout', label: 'خروج', icon: LogOut, action: 'logout' },
+      ]
+    : [
+        { id: 'get-started', label: 'الرئيسية', icon: Compass },
+        { id: 'login', label: 'دخول', icon: LogIn },
+        { id: 'signup', label: 'حساب جديد', icon: UserPlus },
+        { id: 'profile', label: 'حسابي', icon: UserIcon },
+      ];
+
+  const isActive = (id: AppScreen | 'logout') =>
+    id === 'dashboard' ? isDashboard : currentScreen === id;
+
+  const handleItemClick = (item: NavigationItem) => {
+    if (item.action === 'logout') {
+      onLogout();
+      return;
+    }
+    if (item.id === 'dashboard' && !currentUser) {
+      onNavigate('login');
+      return;
+    }
+    onNavigate(item.id as AppScreen);
+  };
+
+  const ThemeButton = ({ compact = false }: { compact?: boolean }) => (
+    <button
+      type="button"
+      onClick={onToggleTheme}
+      aria-label={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'}
+      title={theme === 'dark' ? 'المظهر الفاتح' : 'المظهر الداكن'}
+      className={`inline-flex items-center justify-center rounded-xl border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] ${compact ? 'h-10 w-10' : 'h-9 w-9'}`}
       style={{
-        backgroundColor: theme === 'dark' ? 'rgba(20, 17, 23, 0.72)' : 'rgba(255, 255, 255, 0.75)',
-        borderBottom: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.18)' : '1px solid rgba(223, 192, 202, 0.45)',
-        boxShadow:
-          theme === 'dark'
-            ? '0 12px 36px rgba(0,0,0,0.6), inset 0 1px 1px rgba(214, 184, 120, 0.25)'
-            : '0 12px 36px rgba(118,36,58,0.08), inset 0 1px 2px rgba(255,255,255,0.9)',
-        height: '68px',
+        borderColor: theme === 'dark' ? 'rgba(214,184,120,.32)' : '#E7E2E0',
+        color: theme === 'dark' ? '#D6B878' : '#77717A',
+        backgroundColor: theme === 'dark' ? 'rgba(42,39,48,.72)' : 'rgba(255,255,255,.72)',
       }}
     >
-      <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
-        {/* Zone 1: Brand Wordmark */}
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => onNavigate('get-started')}
-            className="group flex items-center gap-2.5 text-right focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76243A] rounded-2xl"
-          >
-            <div
-              className="w-10 h-10 rounded-2xl overflow-hidden shadow-md transition-all group-hover:scale-105 active:scale-95 border shrink-0"
+      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+
+  const Brand = ({ small = false }: { small?: boolean }) => (
+    <button
+      type="button"
+      onClick={() => onNavigate('get-started')}
+      aria-label="العودة إلى الصفحة الرئيسية"
+      className="flex min-w-0 items-center gap-2.5 rounded-2xl text-right focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
+    >
+      <span
+        className={`block shrink-0 overflow-hidden rounded-xl border ${small ? 'h-9 w-9' : 'h-10 w-10'}`}
+        style={{
+          borderColor: theme === 'dark' ? 'rgba(214,184,120,.45)' : 'rgba(118,36,58,.22)',
+          boxShadow: theme === 'dark' ? '0 0 14px rgba(214,184,120,.14)' : '0 3px 12px rgba(118,36,58,.12)',
+        }}
+      >
+        <img src="/logo.jpg" alt="" className="h-full w-full object-cover" />
+      </span>
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className="whitespace-nowrap text-lg font-black tracking-tight" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>مَسِيري</span>
+        <span className="text-[10px] font-semibold" style={{ color: theme === 'dark' ? '#D6B878' : '#77717A' }}>رحلتك للنمو الروحي</span>
+      </span>
+    </button>
+  );
+
+  return (
+    <>
+      {/* Small mobile brand row. Navigation itself lives at the bottom on phones. */}
+      <header
+        className="sticky top-0 z-40 flex h-[60px] items-center justify-between gap-3 px-4 backdrop-blur-2xl md:hidden"
+        style={{
+          backgroundColor: theme === 'dark' ? 'rgba(20,17,23,.84)' : 'rgba(250,248,245,.86)',
+          borderBottom: theme === 'dark' ? '1px solid rgba(214,184,120,.16)' : '1px solid rgba(231,226,224,.88)',
+        }}
+      >
+        <Brand small />
+        <div className="flex items-center gap-2">
+          {currentUser && (
+            <span className="max-w-[110px] truncate text-xs font-bold" style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
+              {currentUser.name.split(' ')[0]}
+            </span>
+          )}
+          <ThemeButton compact />
+        </div>
+      </header>
+
+      {/* Desktop / tablet landscape top taskbar */}
+      <header
+        className="sticky top-0 z-40 hidden w-full items-center backdrop-blur-3xl md:flex"
+        style={{
+          minHeight: '72px',
+          backgroundColor: theme === 'dark' ? 'rgba(20,17,23,.88)' : 'rgba(255,255,255,.88)',
+          borderBottom: theme === 'dark' ? '1px solid rgba(214,184,120,.18)' : '1px solid rgba(231,226,224,.9)',
+          boxShadow: theme === 'dark' ? '0 10px 30px rgba(0,0,0,.22)' : '0 8px 24px rgba(118,36,58,.05)',
+        }}
+      >
+        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-4 px-5 lg:px-8">
+          <Brand />
+          <nav aria-label="التنقل الرئيسي" className="flex min-w-0 items-center justify-center gap-1 overflow-x-auto py-2">
+            {desktopItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.id);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleItemClick(item)}
+                  aria-current={active ? 'page' : undefined}
+                  className="flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all lg:px-3.5 lg:text-sm"
+                  style={{
+                    backgroundColor: active ? (theme === 'dark' ? 'rgba(118,36,58,.82)' : '#F3E7EB') : 'transparent',
+                    color: active ? (theme === 'dark' ? '#F3DEAB' : '#76243A') : (theme === 'dark' ? '#B8B1BB' : '#77717A'),
+                    border: active ? `1px solid ${theme === 'dark' ? 'rgba(214,184,120,.4)' : '#DFC0CA'}` : '1px solid transparent',
+                  }}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="flex shrink-0 items-center gap-2">
+            {currentUser && (
+              <span className="hidden max-w-[140px] flex-col items-end leading-tight xl:flex">
+                <span className="max-w-full truncate text-sm font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>{currentUser.name}</span>
+                <span className="flex items-center gap-1 text-[10px]" style={{ color: theme === 'dark' ? '#D6B878' : '#77717A' }}>
+                  {isHead ? <ShieldCheck className="h-3 w-3" /> : isTeacher ? <Sparkles className="h-3 w-3" /> : null}
+                  {isHead ? 'أمين الخدمة' : isTeacher ? 'خادم فصلي' : 'طالب إعدادي'}
+                </span>
+              </span>
+            )}
+            <ThemeButton />
+            {currentUser ? (
+              <button
+                type="button"
+                onClick={onLogout}
+                aria-label="تسجيل الخروج"
+                title="تسجيل الخروج"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.28)' : '#E7E2E0', color: theme === 'dark' ? '#D6B878' : '#77717A' }}
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </header>
+
+      {/* Fixed phone bottom navigation with safe-area inset for iOS / Android gesture areas */}
+      <nav
+        aria-label="التنقل السفلي"
+        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 gap-1 border-t px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_28px_rgba(20,17,23,.10)] backdrop-blur-3xl md:hidden"
+        style={{
+          backgroundColor: theme === 'dark' ? 'rgba(24,20,27,.94)' : 'rgba(255,255,255,.94)',
+          borderColor: theme === 'dark' ? 'rgba(214,184,120,.22)' : '#E7E2E0',
+        }}
+      >
+        {mobileItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.id);
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleItemClick(item)}
+              aria-current={active ? 'page' : undefined}
+              aria-label={item.label}
+              className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] sm:text-xs"
               style={{
-                borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.45)' : 'rgba(118, 36, 58, 0.25)',
-                boxShadow: theme === 'dark' ? '0 0 16px rgba(214, 184, 120, 0.25)' : '0 4px 12px rgba(118, 36, 58, 0.2)',
+                color: active ? (theme === 'dark' ? '#F3DEAB' : '#76243A') : (theme === 'dark' ? '#B8B1BB' : '#77717A'),
+                backgroundColor: active ? (theme === 'dark' ? 'rgba(118,36,58,.45)' : '#F8EEF1') : 'transparent',
               }}
             >
-              <img
-                src="/src/assets/images/maseery_app_logo_1791622420580.jpg"
-                alt="شعار مَسِيري"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span
-                className="text-xl font-black tracking-tight whitespace-nowrap"
-                style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
-              >
-                مَسِيري
-              </span>
-              <span className="text-[10px] text-[#77717A] dark:text-[#D6B878] font-semibold">
-                للمرحلة الإعدادية
-              </span>
-            </div>
-          </button>
-        </div>
-
-        {/* Zone 2: Horizontal Taskbar Links (Only welcome, login, signup, profile) */}
-        <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-1">
-          {navItems.map((item) => {
-            const isActive = currentScreen === item.id;
-            const IconComponent = item.icon;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76243A]"
-                style={{
-                  backgroundColor: isActive
-                    ? theme === 'dark'
-                      ? '#76243A'
-                      : '#F3E7EB'
-                    : 'transparent',
-                  color: isActive
-                    ? theme === 'dark'
-                      ? '#F3DEAB'
-                      : '#76243A'
-                    : theme === 'dark'
-                    ? '#B8B1BB'
-                    : '#77717A',
-                  border: isActive
-                    ? `1px solid ${theme === 'dark' ? 'rgba(214, 184, 120, 0.45)' : '#DFC0CA'}`
-                    : '1px solid transparent',
-                  boxShadow: isActive && theme === 'dark'
-                    ? '0 4px 14px rgba(118, 36, 58, 0.5), inset 0 1px 1px rgba(214, 184, 120, 0.3)'
-                    : 'none',
-                }}
-              >
-                <IconComponent
-                  className="w-4 h-4 shrink-0"
-                  style={{ color: isActive && theme === 'dark' ? '#F3DEAB' : undefined }}
-                />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Zone 3: Actions & User / Role Indicator */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Theme Switcher Button */}
-          <button
-            onClick={onToggleTheme}
-            aria-label="تبديل المظهر"
-            className="p-2 rounded-xl border transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76243A]"
-            style={{
-              borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.3)' : '#E7E2E0',
-              color: theme === 'dark' ? '#D6B878' : '#77717A',
-              backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.6)' : 'transparent',
-            }}
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-[#D6B878]" /> : <Moon className="w-4 h-4" />}
-          </button>
-
-          {currentUser ? (
-            <div className="flex items-center gap-2">
-              {/* Role badge */}
-              <div
-                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
-                style={{
-                  backgroundColor: isHead
-                    ? theme === 'dark'
-                      ? '#38232C'
-                      : '#F3E7EB'
-                    : isTeacher
-                    ? theme === 'dark'
-                      ? '#342D20'
-                      : '#F6F0E3'
-                    : theme === 'dark'
-                    ? '#20352A'
-                    : '#E9F4EC',
-                  color: isHead
-                    ? theme === 'dark'
-                      ? '#F3DEAB'
-                      : '#76243A'
-                    : isTeacher
-                    ? theme === 'dark'
-                      ? '#D6B878'
-                      : '#A96F19'
-                    : theme === 'dark'
-                    ? '#75C695'
-                    : '#347653',
-                  border: `1px solid ${
-                    isHead
-                      ? theme === 'dark'
-                        ? '#69404D'
-                        : '#DFC0CA'
-                      : theme === 'dark'
-                      ? '#3A3540'
-                      : '#E7E2E0'
-                  }`,
-                }}
-              >
-                {isHead && <ShieldAlert className="w-3.5 h-3.5" />}
-                {isTeacher && <Sparkles className="w-3.5 h-3.5" />}
-                <span>{isHead ? 'أمين الخدمة' : isTeacher ? 'خادم فصلي' : 'طالب إعدادي'}</span>
-              </div>
-
-              {/* Profile Shortcut */}
-              <button
-                onClick={() => onNavigate('profile')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-transform hover:scale-105 active:scale-95 shadow-sm church-btn-primary"
-                style={{
-                  background:
-                    theme === 'dark'
-                      ? 'linear-gradient(135deg, #76243A 0%, #541424 100%)'
-                      : 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)',
-                  color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF',
-                  border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.45)' : 'none',
-                }}
-              >
-                <span className="max-w-[90px] truncate" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }}>
-                  {currentUser.name.split(' ')[0]}
-                </span>
-              </button>
-
-              {/* Logout Button */}
-              <button
-                onClick={onLogout}
-                title="تسجيل الخروج"
-                className="p-2 rounded-xl border text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                style={{
-                  borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.3)' : '#E7E2E0',
-                  color: theme === 'dark' ? '#B8B1BB' : '#77717A',
-                }}
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => onNavigate('login')}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 shadow-sm church-btn-primary"
-                style={{
-                  background:
-                    theme === 'dark'
-                      ? 'linear-gradient(135deg, #76243A 0%, #541424 100%)'
-                      : 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)',
-                  color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF',
-                  border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.45)' : 'none',
-                }}
-              >
-                <LogIn className="w-3.5 h-3.5" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
-                <span style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }}>دخول</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </header>
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="max-w-full truncate">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 };
