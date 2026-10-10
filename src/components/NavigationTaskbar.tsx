@@ -22,7 +22,8 @@ export type AppScreen =
   | 'dashboard'
   | 'student-dashboard'
   | 'servant-dashboard'
-  | 'supabase';
+  | 'supabase'
+  | 'test';
 
 interface NavigationTaskbarProps {
   currentScreen: AppScreen;
