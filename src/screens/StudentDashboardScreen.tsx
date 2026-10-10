@@ -35,7 +35,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
   const [dashboardError, setDashboardError] = useState('');
   const [verse] = useState<MemoryVerse>(CURRENT_WEEK_VERSE);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [badges] = useState<AchievementBadge[]>(Database.getBadges());
+  const [badges, setBadges] = useState<AchievementBadge[]>(Database.getBadges());
   const [prayerContent, setPrayerContent] = useState('');
   const [prayerIsPrivate, setPrayerIsPrivate] = useState(true);
   const [prayerSentMessage, setPrayerSentMessage] = useState('');
@@ -49,15 +49,16 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
     const loadDashboard = async () => {
       setTasksLoading(true);
       setDashboardError('');
-      const [taskResult, logResult, prayerResult] = await Promise.all([
+      const [taskResult, logResult, prayerResult, badgesResult] = await Promise.all([
         supabase.from('daily_tasks').select('id,title,subtitle,category,points').eq('is_active', true).order('title'),
         supabase.from('student_daily_logs').select('task_id,completed').eq('student_id', currentUser.id).eq('date', today),
         supabase.from('prayer_requests').select('*').eq('student_id', currentUser.id).order('created_at', { ascending: false }),
+        supabase.from('student_badges').select('badge_code').eq('student_id', currentUser.id),
       ]);
 
       if (cancelled) return;
-      if (taskResult.error || logResult.error || prayerResult.error) {
-        console.error('Unable to load student dashboard data:', taskResult.error || logResult.error || prayerResult.error);
+      if (taskResult.error || logResult.error || prayerResult.error || badgesResult.error) {
+        console.error('Unable to load student dashboard data:', taskResult.error || logResult.error || prayerResult.error || badgesResult.error);
         setDashboardError('تعذر تحميل بعض البيانات من قاعدة البيانات. تحقق من اتصالك أو صلاحيات الحساب.');
       }
 
@@ -73,6 +74,8 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
         completed: completedIds.has(row.id),
       }));
       setTasks(mappedTasks);
+      const earnedBadgeCodes = new Set((badgesResult.data || []).map((row: any) => row.badge_code));
+      setBadges(Database.getBadges().map((badge) => ({ ...badge, isUnlocked: earnedBadgeCodes.has(badge.id) })));
 
       setPrayerRequests((prayerResult.data || []).map((row: any) => ({
         id: row.id,
