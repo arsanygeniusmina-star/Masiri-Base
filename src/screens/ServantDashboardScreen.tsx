@@ -40,6 +40,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [approvedTeachersCount, setApprovedTeachersCount] = useState(0);
   const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
   const [bonusPoints, setBonusPoints] = useState(25);
   const [bonusReason, setBonusReason] = useState('حفظ آية الأسبوع والتسميع المتقن');
@@ -61,6 +62,11 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
         supabase.from('prayer_requests').select('*').order('created_at', { ascending: false }),
       ]);
       if (cancelled) return;
+
+      if (currentUser.role === 'head') {
+        const { count, error: countError } = await supabase.from('teachers_whitelist').select('id', { count: 'exact', head: true });
+        if (!cancelled && !countError) setApprovedTeachersCount(count || 0);
+      }
 
       if (studentsResult.error || prayersResult.error) {
         console.error('Unable to load servant dashboard data:', studentsResult.error || prayersResult.error);
@@ -323,7 +329,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
         >
           <span className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-semibold">الخدام المعتمدين</span>
           <p className="text-2xl font-black font-mono" style={{ color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
-            {Database.getTeachersWhitelist().length}
+            {approvedTeachersCount}
           </p>
         </div>
       </div>
