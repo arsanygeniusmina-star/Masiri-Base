@@ -124,6 +124,11 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
 
     const updatedTasks = tasks.map((item) => item.id === taskId ? { ...item, completed: nextCompleted } : item);
     setTasks(updatedTasks);
+    const { data: earnedBadges } = await supabase.from('student_badges').select('badge_code').eq('student_id', currentUser.id);
+    if (earnedBadges) {
+      const earnedCodes = new Set(earnedBadges.map((row: any) => row.badge_code));
+      setBadges(Database.getBadges().map((badge) => ({ ...badge, isUnlocked: earnedCodes.has(badge.id) })));
+    }
     if (updatedTasks.length > 0 && updatedTasks.every((item) => item.completed)) {
       setShowConfettiNotice(true);
       window.setTimeout(() => setShowConfettiNotice(false), 5000);
@@ -169,7 +174,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
 
   // Completed count
   const completedCount = tasks.filter(t => t.completed).length;
-  const progressPercent = Math.round((completedCount / tasks.length) * 100);
+  const progressPercent = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
 
   // Store prayer requests in the shared database with the authenticated student's ID.
   const handleSendPrayer = async (e: React.FormEvent) => {
