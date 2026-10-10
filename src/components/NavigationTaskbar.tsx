@@ -133,7 +133,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
           boxShadow: theme === 'dark' ? '0 0 14px rgba(214,184,120,.14)' : '0 3px 12px rgba(118,36,58,.12)',
         }}
       >
-        <img src="/logo-family.jpg" alt="" className="h-full w-full object-cover" />
+        <img src="/logo-family.jpg?v=20261010-1" alt="" className="h-full w-full object-cover" />
       </span>
       <span className="flex min-w-0 flex-col leading-tight">
         <span className="whitespace-nowrap text-lg font-black tracking-tight" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>مَسِيري</span>
