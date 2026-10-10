@@ -39,6 +39,8 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const cleanEmail = email.trim().toLowerCase();
+
   // Role is assigned by the database using the authenticated user's account
   // and the server-managed teacher allowlist. Never infer privileges from a typed email.
   const isStudent = true;
