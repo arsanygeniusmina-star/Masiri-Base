@@ -210,6 +210,15 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   });
 
   const handleAttendanceChange = async (studentId: string, status: 'present' | 'absent' | 'excused') => {
+    if (simulationMode) {
+      setAttendanceToday((previous) => ({ ...previous, [studentId]: status }));
+      setStudents((previous) => previous.map((student) => student.id === studentId
+        ? { ...student, attendanceRate: status === 'present' ? Math.min(100, student.attendanceRate + 2) : status === 'absent' ? Math.max(0, student.attendanceRate - 2) : student.attendanceRate }
+        : student));
+      setFeedbackToast('تم تسجيل الحضور تجريبياً. لم تتغير سجلات قاعدة البيانات.');
+      window.setTimeout(() => setFeedbackToast(''), 2600);
+      return;
+    }
     const now = new Date();
     const attendanceDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const { error } = await supabase.from('attendance_records').upsert({
@@ -242,6 +251,14 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   // Point changes are performed by a database function that verifies the servant's role and grade.
   const handleAwardPoints = async (studentId: string) => {
     const safePoints = Math.max(1, Math.min(100, Math.round(bonusPoints)));
+    if (simulationMode) {
+      setStudents((previous) => previous.map((student) => student.id === studentId ? { ...student, points: student.points + safePoints } : student));
+      setAwardingStudentId(null);
+      setLatestPointReasons((previous) => ({ ...previous, [studentId]: bonusReason.trim() || 'مكافأة تجريبية' }));
+      setFeedbackToast(`تمت إضافة +${safePoints} نقطة في وضع المحاكاة فقط.`);
+      window.setTimeout(() => setFeedbackToast(''), 3000);
+      return;
+    }
     const { error } = await supabase.from('student_points_award_requests').insert({
       student_id: studentId,
       points: safePoints,
@@ -277,6 +294,31 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
       return;
     }
 
+    if (simulationMode) {
+      if (teacherApprovals.some((teacher) => teacher.email.toLowerCase() === email)) {
+        setFeedbackToast('هذا البريد مسجل بالفعل في بيانات المحاكاة.');
+        window.setTimeout(() => setFeedbackToast(''), 3000);
+        return;
+      }
+      const previewTeacher: TeacherApproval = {
+        id: `preview-teacher-${Date.now()}`,
+        email,
+        name: newTeacherName.trim() || 'خادم جديد',
+        assigned_grade: newTeacherGrade,
+        status: 'active',
+      };
+      const nextApprovals = [previewTeacher, ...teacherApprovals];
+      setTeacherApprovals(nextApprovals);
+      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
+      setFeedbackToast('تمت إضافة الخادم في بيانات المحاكاة فقط؛ لم يتغير اعتماد حقيقي.');
+      setNewTeacherEmail('');
+      setNewTeacherName('');
+      setNewTeacherGrade('grade-2');
+      setIsQuickAddModalOpen(false);
+      window.setTimeout(() => setFeedbackToast(''), 3500);
+      return;
+    }
+
     const { data, error } = await supabase.from('teachers_whitelist').insert({
       email,
       name: newTeacherName.trim() || 'خادم جديد',
@@ -303,6 +345,14 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
 
   const handleUpdateTeacherGrade = async (teacherId: string, grade: MiddleSchoolGrade) => {
     if (!isHead) return;
+    if (simulationMode) {
+      const nextApprovals = teacherApprovals.map((teacher) => teacher.id === teacherId ? { ...teacher, assigned_grade: grade } : teacher);
+      setTeacherApprovals(nextApprovals);
+      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
+      setFeedbackToast('تم تحديث الصف في بيانات المحاكاة فقط.');
+      window.setTimeout(() => setFeedbackToast(''), 3000);
+      return;
+    }
     setSavingTeacherId(teacherId);
 
     const { data, error } = await supabase
@@ -337,6 +387,17 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
       return;
     }
 
+    if (simulationMode) {
+      const nextApprovals = teacherApprovals.map((row) => row.id === teacher.id ? { ...row, status: nextStatus } : row);
+      setTeacherApprovals(nextApprovals);
+      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
+      setFeedbackToast(nextStatus === 'active'
+        ? 'تمت إعادة اعتماد الخادم في بيانات المحاكاة فقط.'
+        : 'تم إيقاف اعتماد الخادم في بيانات المحاكاة فقط.');
+      window.setTimeout(() => setFeedbackToast(''), 3200);
+      return;
+    }
+
     setSavingTeacherId(teacher.id);
     const { data, error } = await supabase
       .from('teachers_whitelist')
@@ -367,6 +428,12 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
 
   // Moderation is written to Supabase; RLS limits status updates to head/teacher roles.
   const handleMarkPrayed = async (id: string) => {
+    if (simulationMode) {
+      setPrayerRequests((previous) => previous.map((request) => request.id === id ? { ...request, status: 'prayed' } : request));
+      setFeedbackToast('تم تحديث طلب الصلاة في بيانات المحاكاة فقط.');
+      window.setTimeout(() => setFeedbackToast(''), 2800);
+      return;
+    }
     const { error } = await supabase.from('prayer_requests').update({ status: 'prayed' }).eq('id', id);
     if (error) {
       console.error('Unable to update prayer request status:', error);
