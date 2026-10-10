@@ -97,9 +97,16 @@ $function$;
 revoke all on function private.handle_new_auth_user() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created_maseery on auth.users;
+drop trigger if exists on_auth_user_email_updated_maseery on auth.users;
 create trigger on_auth_user_created_maseery
-after insert or update of email on auth.users
+after insert on auth.users
 for each row execute function private.handle_new_auth_user();
+
+create trigger on_auth_user_email_updated_maseery
+after update of email on auth.users
+for each row
+when (old.email is distinct from new.email)
+execute function private.handle_new_auth_user();
 
 create or replace function private.sync_teacher_whitelist_profile()
 returns trigger
