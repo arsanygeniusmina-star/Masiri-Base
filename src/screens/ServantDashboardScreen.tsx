@@ -62,6 +62,9 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   const [bonusPoints, setBonusPoints] = useState(25);
   const [bonusReason, setBonusReason] = useState('حفظ آية الأسبوع والتسميع المتقن');
   const [feedbackToast, setFeedbackToast] = useState('');
+  const [attendanceToday, setAttendanceToday] = useState<Record<string, 'present' | 'absent' | 'excused'>>({});
+  const [attendanceAverage, setAttendanceAverage] = useState<number | null>(null);
+  const [latestPointReasons, setLatestPointReasons] = useState<Record<string, string>>({});
 
   // Quick Add Teacher Plus Button Modal for Head
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
@@ -74,9 +77,12 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
     let cancelled = false;
     const loadServantData = async () => {
       setIsLoadingData(true);
-      const [studentsResult, prayersResult] = await Promise.all([
+      const today = new Date().toLocaleDateString('en-CA');
+      const [studentsResult, prayersResult, attendanceResult, pointsHistoryResult] = await Promise.all([
         supabase.from('users').select('*').eq('role', 'student').order('name'),
         supabase.from('prayer_requests').select('*').order('created_at', { ascending: false }),
+        supabase.from('attendance_records').select('student_id, attendance_date, status'),
+        supabase.from('student_points_history').select('student_id, reason, created_at').order('created_at', { ascending: false }).limit(500),
       ]);
       if (cancelled) return;
 
@@ -96,24 +102,38 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
         }
       }
 
-      if (studentsResult.error || prayersResult.error) {
-        console.error('Unable to load servant dashboard data:', studentsResult.error || prayersResult.error);
+      if (studentsResult.error || prayersResult.error || attendanceResult.error || pointsHistoryResult.error) {
+        console.error('Unable to load servant dashboard data:', studentsResult.error || prayersResult.error || attendanceResult.error || pointsHistoryResult.error);
         setFeedbackToast('تعذر تحميل بيانات الخدمة من قاعدة البيانات. تحقق من الصلاحيات أو الاتصال.');
       } else {
-        setStudents((studentsResult.data || []).map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          gradeLevel: row.grade_level || 'grade-2',
-          churchFamily: row.church_family || '',
-          spiritualFather: row.spiritual_father || '',
-          phone: row.phone || '',
-          attendanceRate: 0,
-          points: Number(row.points || 0),
-          streakDays: Number(row.streak_days || 0),
-          lastActive: row.created_at || '',
-          teacherNotes: '',
-        })));
+        const attendanceRows = attendanceResult.data || [];
+        const todayRows = attendanceRows.filter((row: any) => row.attendance_date === today);
+        const todayMap: Record<string, 'present' | 'absent' | 'excused'> = {};
+        todayRows.forEach((row: any) => { todayMap[row.student_id] = row.status; });
+        setAttendanceToday(todayMap);
+        const countedRows = attendanceRows.filter((row: any) => row.status === 'present' || row.status === 'absent');
+        setAttendanceAverage(countedRows.length ? Math.round(countedRows.filter((row: any) => row.status === 'present').length / countedRows.length * 100) : null);
+        const reasons: Record<string, string> = {};
+        (pointsHistoryResult.data || []).forEach((row: any) => { if (!reasons[row.student_id]) reasons[row.student_id] = row.reason; });
+        setLatestPointReasons(reasons);
+        setStudents((studentsResult.data || []).map((row: any) => {
+          const records = attendanceRows.filter((record: any) => record.student_id === row.id && (record.status === 'present' || record.status === 'absent'));
+          const rate = records.length ? Math.round(records.filter((record: any) => record.status === 'present').length / records.length * 100) : 0;
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            gradeLevel: row.grade_level || 'grade-2',
+            churchFamily: row.church_family || '',
+            spiritualFather: row.spiritual_father || '',
+            phone: row.phone || '',
+            attendanceRate: rate,
+            points: Number(row.points || 0),
+            streakDays: Number(row.streak_days || 0),
+            lastActive: row.created_at || '',
+            teacherNotes: '',
+          };
+        }));
         setPrayerRequests((prayersResult.data || []).map((row: any) => ({
           id: row.id,
           studentId: row.student_id,
@@ -138,12 +158,38 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
     return matchesGrade && matchesSearch;
   });
 
+  const handleAttendanceChange = async (studentId: string, status: 'present' | 'absent' | 'excused') => {
+    const attendanceDate = new Date().toLocaleDateString('en-CA');
+    const { error } = await supabase.from('attendance_records').upsert({
+      student_id: studentId,
+      attendance_date: attendanceDate,
+      status,
+      marked_by: currentUser.id,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'student_id,attendance_date' });
+    if (error) {
+      console.error('Unable to save attendance:', error);
+      setFeedbackToast('تعذر حفظ الحضور. تحقق من صلاحيات الفصل ثم حاول مرة أخرى.');
+      window.setTimeout(() => setFeedbackToast(''), 3500);
+      return;
+    }
+    setAttendanceToday((previous) => ({ ...previous, [studentId]: status }));
+    setFeedbackToast('تم حفظ الحضور في قاعدة البيانات.');
+    window.setTimeout(() => setFeedbackToast(''), 2200);
+    const { data } = await supabase.from('attendance_records').select('status');
+    if (data) {
+      const counted = data.filter((row: any) => row.status === 'present' || row.status === 'absent');
+      setAttendanceAverage(counted.length ? Math.round(counted.filter((row: any) => row.status === 'present').length / counted.length * 100) : null);
+    }
+  };
+
   // Point changes are performed by a database function that verifies the servant's role and grade.
   const handleAwardPoints = async (studentId: string) => {
     const safePoints = Math.max(1, Math.min(100, Math.round(bonusPoints)));
     const { error } = await supabase.rpc('award_student_points', {
       p_student_id: studentId,
       p_points: safePoints,
+      p_reason: bonusReason.trim(),
     });
     if (error) {
       console.error('Unable to award student points:', error);
@@ -407,7 +453,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
         >
           <span className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-semibold">متوسط الحضور</span>
           <p className="text-2xl font-black font-mono text-green-600 dark:text-green-400">
-            89%
+            {attendanceAverage === null ? '—' : `${attendanceAverage}%`}
           </p>
         </div>
 
@@ -612,13 +658,24 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
                         {std.attendanceRate}%
                       </span>
                       <span className="text-[10px] text-[#77717A] dark:text-[#B8B1BB]">
-                        ({std.streakDays} يوم متواصل)
+                        {attendanceToday[std.id] === 'present' ? 'حاضر اليوم' : attendanceToday[std.id] === 'absent' ? 'غائب اليوم' : attendanceToday[std.id] === 'excused' ? 'غياب بعذر' : 'لم يُسجل اليوم'}
                       </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {([
+                        ['present', 'حاضر'], ['absent', 'غائب'], ['excused', 'بعذر'],
+                      ] as const).map(([status, label]) => (
+                        <button key={status} type="button" onClick={() => void handleAttendanceChange(std.id, status)}
+                          className={`rounded-lg border px-2 py-1 text-[10px] font-semibold transition-colors ${attendanceToday[std.id] === status ? 'bg-[#76243A] text-white border-[#76243A]' : 'border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                          {label}
+                        </button>
+                      ))}
                     </div>
                   </td>
 
                   <td className="py-3 px-3 font-mono font-bold text-sm" style={{ color: theme === 'dark' ? '#B65370' : '#76243A' }}>
-                    {std.points}
+                    <div>{std.points}</div>
+                    {latestPointReasons[std.id] && <div className="mt-1 max-w-40 font-sans text-[10px] font-normal text-[#77717A] dark:text-[#B8B1BB]">آخر سبب: {latestPointReasons[std.id]}</div>}
                   </td>
 
                   <td className="py-3 px-3">
