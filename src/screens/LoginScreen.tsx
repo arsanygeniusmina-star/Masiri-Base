@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
-import { Database, HEAD_EMAIL_DEFAULT } from '../db/storage';
+import { supabase, fetchUserProfile } from '../lib/supabase';
 import { User } from '../types';
 import { AppScreen } from '../components/NavigationTaskbar';
 import { BrandSpinner, FormLoadingOverlay } from '../components/BrandLoadingSkeleton';
@@ -25,7 +25,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const cleanEmail = email.trim().toLowerCase();
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -33,82 +33,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setErrorMsg('يرجى إدخال بريد إلكتروني صحيح.');
       return;
     }
-
-    if (!password.trim()) {
+    if (!password) {
       setErrorMsg('يرجى كتابة كلمة المرور.');
       return;
     }
 
     setIsLoading(true);
-
-    setTimeout(() => {
-      setIsLoading(false);
-
-      // 1. Is it Head email?
-      if (Database.isHeadEmail(cleanEmail)) {
-        const headUser: User = {
-          id: 'usr-head-01',
-          name: 'مينا سامح ضيف',
-          email: cleanEmail,
-          role: 'head',
-          phone: '01223456789',
-          churchName: 'كنيسة السيدة العذراء والشهيد مارمرقس',
-          streakDays: 45,
-          points: 1250,
-          createdAt: new Date().toISOString(),
-        };
-        Database.saveUser(headUser);
-        Database.setCurrentUser(headUser);
-        onLoginSuccess(headUser);
-        return;
-      }
-
-      // 2. Is it in the teachers whitelist added by the Head?
-      const isTeacherWhitelisted = Database.isEmailWhitelistedForTeacher(cleanEmail);
-      if (isTeacherWhitelisted) {
-        const whitelistEntry = Database.getTeachersWhitelist().find(t => t.email.toLowerCase() === cleanEmail);
-        const teacherUser: User = {
-          id: `usr-teacher-${Date.now()}`,
-          name: whitelistEntry?.name || 'خادم معتمد',
-          email: cleanEmail,
-          role: 'teacher',
-          gradeLevel: whitelistEntry?.assignedGrade || 'grade-2',
-          churchName: 'كنيسة السيدة العذراء والشهيد مارمرقس',
-          streakDays: 1,
-          points: 500,
-          createdAt: new Date().toISOString(),
-        };
-        Database.saveUser(teacherUser);
-        Database.setCurrentUser(teacherUser);
-        onLoginSuccess(teacherUser);
-        return;
-      }
-
-      // 3. Otherwise student!
-      const users = Database.getUsers();
-      const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
-      if (existing) {
-        Database.setCurrentUser(existing);
-        onLoginSuccess(existing);
-        return;
-      }
-
-      // Fresh student account on login
-      const newStudent: User = {
-        id: `usr-${Date.now()}`,
-        name: cleanEmail.split('@')[0],
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
-        role: 'student',
-        gradeLevel: 'grade-2',
-        churchName: 'كنيسة السيدة العذراء والشهيد مارمرقس',
-        streakDays: 1,
-        points: 100,
-        createdAt: new Date().toISOString(),
-      };
-      Database.saveUser(newStudent);
-      Database.setCurrentUser(newStudent);
-      onLoginSuccess(newStudent);
-    }, 280);
+        password,
+      });
+
+      if (error || !data.user) {
+        setErrorMsg('تعذر تسجيل الدخول. راجع البريد الإلكتروني وكلمة المرور، وتأكد من تأكيد بريدك الإلكتروني.');
+        return;
+      }
+
+      const profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        await supabase.auth.signOut();
+        setErrorMsg('تم التحقق من الحساب لكن ملف المستخدم غير موجود. تواصل مع مسؤول مسيري لإصلاح ملف الحساب.');
+        return;
+      }
+
+      onLoginSuccess(profile);
+    } catch (error) {
+      console.error('Masiri sign-in failed:', error);
+      setErrorMsg('حدث خطأ أثناء الاتصال بقاعدة البيانات. تحقق من الإنترنت ثم حاول مرة أخرى.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -216,7 +171,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 className="text-[11px] font-semibold"
                 style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}
               >
-                تلقائياً: أي كلمة مرور للحساب المسجل
+                أدخل كلمة المرور المستخدمة عند التسجيل.
               </span>
             </div>
             <div className="relative">
