@@ -146,19 +146,33 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           error?.status === 429 ||
           normalizedReason.includes('email rate limit exceeded') ||
           normalizedReason.includes('over_email_send_rate_limit');
-        const message = isEmailRateLimit
-          ? 'رفض خادم الحسابات التسجيل بسبب تجاوز حد إرسال رسائل البريد الإلكتروني. لم يُنشأ الحساب. يلزم إيقاف Confirm email من إعدادات Authentication في مشروع Supabase حتى لا يحتاج التسجيل إلى رسالة تأكيد.'
-          : reason
-            ? `تعذر إنشاء الحساب: ${reason}`
-            : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.';
+        const isAlreadyRegistered =
+          error?.code === 'user_already_exists' ||
+          normalizedReason.includes('user already registered') ||
+          normalizedReason.includes('already been registered');
+        const message = isAlreadyRegistered
+          ? 'هذا البريد الإلكتروني مسجل بالفعل. استخدم زر تسجيل الدخول أسفل النموذج أو استعادة كلمة المرور بدلاً من إنشاء حساب ثانٍ.'
+          : isEmailRateLimit
+            ? 'رفض خادم Supabase طلب التسجيل بسبب حد إرسال البريد (429). إعداد المشروع يسمح الآن بالتسجيل دون تأكيد البريد؛ لا تكرر الطلب بسرعة. إذا كان هذا البريد مسجلاً بالفعل، انتقل إلى تسجيل الدخول.'
+            : reason
+              ? `تعذر إنشاء الحساب: ${reason}`
+              : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.';
         console.error('Masiri signup rejected by Supabase Auth:', error ?? 'No user returned');
         setErrorMsg(message);
         setSubmitFeedback({ tone: 'error', text: message });
         return;
       }
 
+      // Supabase can return an empty identities list for a duplicate email.
+      if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        const message = 'هذا البريد الإلكتروني مسجل بالفعل. انتقل إلى تسجيل الدخول أو استعادة كلمة المرور؛ لن ننشئ حساباً مكرراً.';
+        setErrorMsg(message);
+        setSubmitFeedback({ tone: 'error', text: message });
+        return;
+      }
+
       if (!data.session) {
-        const message = 'لم تكتمل عملية التسجيل لأن خادم الحسابات لم يمنح جلسة دخول. أوقف Confirm email في إعدادات Authentication بمشروع Supabase، ثم أعد المحاولة.';
+        const message = 'لم يُرجع خادم الحسابات جلسة دخول بعد التسجيل. لا تعِد المحاولة بالبريد نفسه فوراً؛ جرّب تسجيل الدخول، وإذا استمر الخطأ أرسل هذه الرسالة إلى أمين الخدمة.';
         setErrorMsg(message);
         setSubmitFeedback({ tone: 'error', text: message });
         return;
