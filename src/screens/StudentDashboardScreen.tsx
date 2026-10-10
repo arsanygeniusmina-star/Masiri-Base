@@ -140,6 +140,30 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
     setTimeout(() => setCopiedVerse(false), 2500);
   };
 
+  const handleVerseAudio = () => {
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      setDashboardError('ميزة قراءة الآية صوتياً غير مدعومة في هذا المتصفح. جرّب متصفحاً أحدث.');
+      return;
+    }
+    if (isPlayingAudio) {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(`${verse.verseText}. ${verse.reference}`);
+    utterance.lang = 'ar';
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => {
+      setIsPlayingAudio(false);
+      setDashboardError('تعذرت قراءة الآية صوتياً. تحقق من إعدادات الصوت في جهازك.');
+    };
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    setIsPlayingAudio(true);
+  };
+
+  useEffect(() => () => { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); }, []);
+
   // Completed count
   const completedCount = tasks.filter(t => t.completed).length;
   const progressPercent = Math.round((completedCount / tasks.length) * 100);
@@ -515,7 +539,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
                   </button>
 
                   <button
-                    onClick={() => setIsPlayingAudio(!isPlayingAudio)}
+                    onClick={handleVerseAudio}
                     className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl border transition-all hover:scale-105 active:scale-95"
                     style={{
                       backgroundColor: theme === 'dark' ? '#76243A' : '#76243A',
@@ -524,7 +548,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
                       boxShadow: theme === 'dark' ? '0 4px 15px rgba(118, 36, 58, 0.5)' : '0 4px 12px rgba(118, 36, 58, 0.25)',
                     }}
                   >
-                    {/* Simulated Equalizer Bars */}
+                    {/* Playback indicator for the browser's Arabic text-to-speech voice */}
                     {isPlayingAudio ? (
                       <div className="flex items-center gap-0.5 h-3">
                         <span className="w-0.5 h-3 bg-current animate-pulse" />
