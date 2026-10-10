@@ -34,8 +34,8 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    startTestRuntimeLogCapture();
-  }, []);
+    if (currentUser?.role === 'test') startTestRuntimeLogCapture();
+  }, [currentUser?.role]);
 
   useEffect(() => {
     let active = true;
