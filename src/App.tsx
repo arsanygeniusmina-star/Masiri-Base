@@ -265,6 +265,7 @@ export default function App() {
           currentUser={displayUser}
           onUpdateUser={handleUpdateCurrentUser}
           theme={theme}
+          simulationMode={currentUser.role === 'test' && Boolean(previewRole)}
         />
       );
     }
@@ -273,6 +274,7 @@ export default function App() {
         currentUser={displayUser}
         onNavigate={handleNavigate}
         theme={theme}
+        simulationMode={currentUser.role === 'test' && Boolean(previewRole)}
       />
     );
   };
@@ -341,10 +343,10 @@ export default function App() {
             {(currentScreen === 'dashboard' || currentScreen === 'student-dashboard' || currentScreen === 'servant-dashboard') && (
               previewRole ? (
                 <div className="relative">
-                  <div className="pointer-events-none absolute inset-x-4 top-4 z-20 mx-auto max-w-2xl rounded-2xl border p-3 text-center text-xs font-bold shadow-lg" style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.45)' : '#DFC0CA', background: theme === 'dark' ? 'rgba(32,24,34,.95)' : 'rgba(255,255,255,.96)', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
-                    وضع معاينة للقراءة فقط — قاعدة البيانات ما زالت تتعامل مع حساب TEST الحقيقي
+                  <div className="relative z-20 mx-4 mt-4 rounded-2xl border p-3 text-center text-xs font-bold shadow-lg" role="status" style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.45)' : '#DFC0CA', background: theme === 'dark' ? 'rgba(32,24,34,.95)' : 'rgba(255,255,255,.96)', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
+                    وضع محاكاة تفاعلي — يمكنك تجربة الأزرار والعمليات. التغييرات تجريبية ومحلية ولا تعدّل حسابات أو بيانات حقيقية.
                   </div>
-                  <div inert className="pointer-events-none select-none opacity-80" aria-label="معاينة واجهة للقراءة فقط">{renderDashboard()}</div>
+                  {renderDashboard()}
                 </div>
               ) : renderDashboard()
             )}
