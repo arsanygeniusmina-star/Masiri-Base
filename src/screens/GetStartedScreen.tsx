@@ -43,7 +43,7 @@ export const GetStartedScreen: React.FC<GetStartedScreenProps> = ({
             }}
           >
             <img
-              src="/src/assets/images/maseery_app_logo_1791622420580.jpg"
+              src="/logo.jpg"
               alt="شعار مَسِيري الرسمي"
               className="w-full h-full object-cover rounded-2xl"
             />
