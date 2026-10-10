@@ -68,7 +68,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
         id: row.id,
         title: row.title,
         subtitle: row.subtitle || '',
-        category: ['prayer', 'bible', 'liturgy', 'verse', 'kindness'].includes(row.category) ? row.category : 'prayer',
+        category: (['prayer', 'bible', 'liturgy', 'verse', 'kindness'].includes(row.category) ? row.category : 'prayer') as DailySpiritualTask['category'],
         points: Number(row.points || 0),
         completed: completedIds.has(row.id),
       }));
