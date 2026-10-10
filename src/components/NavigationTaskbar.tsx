@@ -204,7 +204,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
                 <span className="max-w-full truncate text-sm font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>{currentUser.name}</span>
                 <span className="flex items-center gap-1 text-[10px]" style={{ color: theme === 'dark' ? '#D6B878' : '#77717A' }}>
                   {isHead ? <ShieldCheck className="h-3 w-3" /> : isTeacher ? <Sparkles className="h-3 w-3" /> : null}
-                  {isHead ? 'أمين الخدمة' : isTeacher ? 'خادم فصلي' : 'طالب إعدادي'}
+                  {isHead ? 'أمين الخدمة' : isTeacher ? 'خادم فصلي' : isTest ? 'اختبار داخلي' : 'طالب إعدادي'}
                 </span>
               </span>
             )}
