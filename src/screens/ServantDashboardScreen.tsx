@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, StudentRecord, PrayerRequest, MiddleSchoolGrade } from '../types';
-import { Database } from '../db/storage';
+import { supabase } from '../lib/supabase';
+import type { AppScreen } from '../components/NavigationTaskbar';
 import {
   Users,
   CheckCircle,
@@ -24,7 +25,7 @@ import { SupabaseGuideModal } from '../components/SupabaseGuideModal';
 
 interface ServantDashboardScreenProps {
   currentUser: User;
-  onNavigate: (screen: 'get-started' | 'login' | 'signup' | 'profile' | 'dashboard' | 'supabase') => void;
+  onNavigate: (screen: AppScreen) => void;
   theme: 'light' | 'dark';
 }
 
@@ -33,11 +34,12 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   onNavigate,
   theme,
 }) => {
-  const isHead = currentUser.role === 'head' || Database.isHeadEmail(currentUser.email);
-  const [students, setStudents] = useState<StudentRecord[]>(Database.getStudentRecords());
+  const isHead = currentUser.role === 'head';
+  const [students, setStudents] = useState<StudentRecord[]>([]);
   const [selectedGrade, setSelectedGrade] = useState<'all' | MiddleSchoolGrade>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>(Database.getPrayerRequests());
+  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
   const [bonusPoints, setBonusPoints] = useState(25);
   const [bonusReason, setBonusReason] = useState('حفظ آية الأسبوع والتسميع المتقن');
@@ -50,6 +52,51 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   const [newTeacherGrade, setNewTeacherGrade] = useState<MiddleSchoolGrade>('grade-2');
   const [isSupabaseGuideOpen, setIsSupabaseGuideOpen] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadServantData = async () => {
+      setIsLoadingData(true);
+      const [studentsResult, prayersResult] = await Promise.all([
+        supabase.from('users').select('*').eq('role', 'student').order('name'),
+        supabase.from('prayer_requests').select('*').order('created_at', { ascending: false }),
+      ]);
+      if (cancelled) return;
+
+      if (studentsResult.error || prayersResult.error) {
+        console.error('Unable to load servant dashboard data:', studentsResult.error || prayersResult.error);
+        setFeedbackToast('تعذر تحميل بيانات الخدمة من قاعدة البيانات. تحقق من الصلاحيات أو الاتصال.');
+      } else {
+        setStudents((studentsResult.data || []).map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          gradeLevel: row.grade_level || 'grade-2',
+          churchFamily: row.church_family || '',
+          spiritualFather: row.spiritual_father || '',
+          phone: row.phone || '',
+          attendanceRate: 0,
+          points: Number(row.points || 0),
+          streakDays: Number(row.streak_days || 0),
+          lastActive: row.created_at || '',
+          teacherNotes: '',
+        })));
+        setPrayerRequests((prayersResult.data || []).map((row: any) => ({
+          id: row.id,
+          studentId: row.student_id,
+          studentName: row.student_name,
+          content: row.content,
+          isPrivate: Boolean(row.is_private),
+          status: row.status === 'prayed' ? 'prayed' : 'pending',
+          createdAt: row.created_at,
+        })));
+      }
+      setIsLoadingData(false);
+    };
+
+    void loadServantData();
+    return () => { cancelled = true; };
+  }, [currentUser.id, currentUser.role]);
+
   // Filter students
   const filteredStudents = students.filter((s) => {
     const matchesGrade = selectedGrade === 'all' || s.gradeLevel === selectedGrade;
@@ -57,51 +104,88 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
     return matchesGrade && matchesSearch;
   });
 
-  // Handle Award Points
-  const handleAwardPoints = (studentId: string) => {
-    const updated = Database.awardPointsToStudent(studentId, bonusPoints, bonusReason);
-    if (updated) {
-      setStudents(Database.getStudentRecords());
-      setAwardingStudentId(null);
-      setFeedbackToast(`تم منح +${bonusPoints} نقطة للطالب (${updated.name}) بنجاح!`);
-      setTimeout(() => setFeedbackToast(''), 3000);
+  // Point changes are performed by a database function that verifies the servant's role and grade.
+  const handleAwardPoints = async (studentId: string) => {
+    const safePoints = Math.max(1, Math.min(100, Math.round(bonusPoints)));
+    const { error } = await supabase.rpc('award_student_points', {
+      p_student_id: studentId,
+      p_points: safePoints,
+    });
+    if (error) {
+      console.error('Unable to award student points:', error);
+      setFeedbackToast('تعذر منح النقاط. تأكد من أنك خادم معتمد وأن الطالب ضمن فصلك.');
+      window.setTimeout(() => setFeedbackToast(''), 3500);
+      return;
     }
+
+    const { data, error: refreshError } = await supabase.from('users').select('*').eq('role', 'student').order('name');
+    if (!refreshError && data) {
+      setStudents(data.map((row: any) => ({
+        id: row.id, name: row.name, email: row.email, gradeLevel: row.grade_level || 'grade-2',
+        churchFamily: row.church_family || '', spiritualFather: row.spiritual_father || '',
+        phone: row.phone || '', attendanceRate: 0, points: Number(row.points || 0),
+        streakDays: Number(row.streak_days || 0), lastActive: row.created_at || '', teacherNotes: '',
+      })));
+    }
+    setAwardingStudentId(null);
+    setFeedbackToast(`تم منح +${safePoints} نقطة للطالب بنجاح.`);
+    window.setTimeout(() => setFeedbackToast(''), 3000);
   };
 
-  // Handle Quick Add Teacher from Dashboard (Exclusive to Head)
-  const handleQuickAddTeacher = (e: React.FormEvent) => {
+  // The database RLS policy allows this insert only for the authenticated head account.
+  const handleQuickAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isHead) return;
 
-    const res = Database.addTeacherEmail(
-      newTeacherEmail,
-      newTeacherName,
-      currentUser.email,
-      newTeacherGrade,
-      'تمت الإضافة من لوحة الخدمة'
-    );
+    const email = newTeacherEmail.trim().toLowerCase();
+    if (!email.includes('@')) {
+      setFeedbackToast('يرجى إدخال بريد إلكتروني صحيح.');
+      return;
+    }
 
-    if (res.success) {
-      setFeedbackToast(`تمت إضافة الخادم بنجاح! بمجرد أن يسجل بهذا البريد (${newTeacherEmail}) سيدخل كخادم.`);
+    const { error } = await supabase.from('teachers_whitelist').insert({
+      email,
+      name: newTeacherName.trim() || 'خادم جديد',
+      assigned_grade: newTeacherGrade,
+      added_by: currentUser.email,
+      notes: 'تمت الإضافة من لوحة الخدمة',
+      status: 'active',
+    });
+
+    if (error) {
+      setFeedbackToast(error.code === '23505' ? 'هذا البريد مسجل بالفعل.' : 'تعذرت إضافة الخادم. تأكد من صلاحية أمين الخدمة.');
+    } else {
+      setFeedbackToast(`تم اعتماد ${email} في قاعدة البيانات. سيتم تحديد دوره عند التسجيل.`);
       setNewTeacherEmail('');
       setNewTeacherName('');
       setIsQuickAddModalOpen(false);
-    } else {
-      setFeedbackToast(res.message);
     }
-    setTimeout(() => setFeedbackToast(''), 4000);
+    window.setTimeout(() => setFeedbackToast(''), 4000);
   };
 
-  // Mark prayer request prayed
-  const handleMarkPrayed = (id: string) => {
-    Database.markPrayerDone(id);
-    setPrayerRequests(Database.getPrayerRequests());
-    setFeedbackToast('تم تحديد طلب الصلاة كـ "تمت الصلاة" وتوصيل البركة للطالب.');
-    setTimeout(() => setFeedbackToast(''), 3000);
+  // Moderation is written to Supabase; RLS limits status updates to head/teacher roles.
+  const handleMarkPrayed = async (id: string) => {
+    const { error } = await supabase.from('prayer_requests').update({ status: 'prayed' }).eq('id', id);
+    if (error) {
+      console.error('Unable to update prayer request status:', error);
+      setFeedbackToast('تعذر تحديث حالة طلب الصلاة. تحقق من صلاحياتك.');
+      window.setTimeout(() => setFeedbackToast(''), 3000);
+      return;
+    }
+    setPrayerRequests((previous) => previous.map((request) => request.id === id ? { ...request, status: 'prayed' } : request));
+    setFeedbackToast('تم حفظ حالة طلب الصلاة في قاعدة البيانات.');
+    window.setTimeout(() => setFeedbackToast(''), 3000);
   };
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 relative">
+      {isLoadingData && (
+        <div role="status" className="relative z-10 rounded-2xl border p-3 text-sm"
+          style={{ borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0', color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
+          جاري تحميل بيانات الخدمة من قاعدة البيانات...
+        </div>
+      )}
+
       {/* Background Ambient Glow */}
       <div className="absolute top-10 right-10 w-96 h-96 rounded-full bg-[#76243A]/15 dark:bg-[#B65370]/15 blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-96 h-96 rounded-full bg-[#C5A15A]/15 dark:bg-[#D6B878]/10 blur-3xl pointer-events-none" />
