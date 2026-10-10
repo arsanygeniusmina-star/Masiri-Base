@@ -77,7 +77,8 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
     let cancelled = false;
     const loadServantData = async () => {
       setIsLoadingData(true);
-      const today = new Date().toLocaleDateString('en-CA');
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const [studentsResult, prayersResult, attendanceResult, pointsHistoryResult] = await Promise.all([
         supabase.from('users').select('*').eq('role', 'student').order('name'),
         supabase.from('prayer_requests').select('*').order('created_at', { ascending: false }),
@@ -159,7 +160,8 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   });
 
   const handleAttendanceChange = async (studentId: string, status: 'present' | 'absent' | 'excused') => {
-    const attendanceDate = new Date().toLocaleDateString('en-CA');
+    const now = new Date();
+    const attendanceDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const { error } = await supabase.from('attendance_records').upsert({
       student_id: studentId,
       attendance_date: attendanceDate,
@@ -176,10 +178,14 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
     setAttendanceToday((previous) => ({ ...previous, [studentId]: status }));
     setFeedbackToast('تم حفظ الحضور في قاعدة البيانات.');
     window.setTimeout(() => setFeedbackToast(''), 2200);
-    const { data } = await supabase.from('attendance_records').select('status');
+    const { data } = await supabase.from('attendance_records').select('student_id,status');
     if (data) {
       const counted = data.filter((row: any) => row.status === 'present' || row.status === 'absent');
       setAttendanceAverage(counted.length ? Math.round(counted.filter((row: any) => row.status === 'present').length / counted.length * 100) : null);
+      setStudents((previous) => previous.map((student) => {
+        const records = data.filter((row: any) => row.student_id === student.id && (row.status === 'present' || row.status === 'absent'));
+        return { ...student, attendanceRate: records.length ? Math.round(records.filter((row: any) => row.status === 'present').length / records.length * 100) : 0 };
+      }));
     }
   };
 
@@ -208,6 +214,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
       })));
     }
     setAwardingStudentId(null);
+    setLatestPointReasons((previous) => ({ ...previous, [studentId]: bonusReason.trim() }));
     setFeedbackToast(`تم منح +${safePoints} نقطة للطالب بنجاح.`);
     window.setTimeout(() => setFeedbackToast(''), 3000);
   };
