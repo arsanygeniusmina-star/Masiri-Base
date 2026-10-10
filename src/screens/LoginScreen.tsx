@@ -29,11 +29,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
     setIsLoading(true);
+    try {
+      window.sessionStorage.setItem('masiri.auth-transition-after-oauth', '1');
+    } catch {
+      // The normal post-auth route still works if browser storage is restricted.
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
     });
     if (error) {
+      try {
+        window.sessionStorage.removeItem('masiri.auth-transition-after-oauth');
+      } catch {
+        // Ignore storage restrictions and show the actual authentication error.
+      }
       setErrorMsg('تسجيل الدخول بجوجل غير مُفعّل بعد. يلزم إعداد Google OAuth في لوحة Supabase أولاً.');
       setIsLoading(false);
     }
