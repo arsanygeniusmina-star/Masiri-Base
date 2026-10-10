@@ -192,10 +192,10 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   // Point changes are performed by a database function that verifies the servant's role and grade.
   const handleAwardPoints = async (studentId: string) => {
     const safePoints = Math.max(1, Math.min(100, Math.round(bonusPoints)));
-    const { error } = await supabase.rpc('award_student_points', {
-      p_student_id: studentId,
-      p_points: safePoints,
-      p_reason: bonusReason.trim(),
+    const { error } = await supabase.from('student_points_award_requests').insert({
+      student_id: studentId,
+      points: safePoints,
+      reason: bonusReason.trim(),
     });
     if (error) {
       console.error('Unable to award student points:', error);
