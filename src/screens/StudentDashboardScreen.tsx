@@ -130,6 +130,19 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
     const nextCompleted = !task.completed;
     setDashboardError('');
 
+    if (simulationMode) {
+      const updatedTasks = tasks.map((item) => item.id === taskId ? { ...item, completed: nextCompleted } : item);
+      setTasks(updatedTasks);
+      onUpdateUser({ ...currentUser, points: Math.max(0, currentUser.points + (nextCompleted ? task.points : -task.points)) });
+      const completedTasks = updatedTasks.filter((item) => item.completed).length;
+      setBadges(Database.getBadges().map((badge, index) => ({ ...badge, isUnlocked: index < completedTasks })));
+      if (updatedTasks.length > 0 && updatedTasks.every((item) => item.completed)) {
+        setShowConfettiNotice(true);
+        window.setTimeout(() => setShowConfettiNotice(false), 5000);
+      }
+      return;
+    }
+
     const { error } = await supabase
       .from('student_daily_logs')
       .upsert({
@@ -206,6 +219,23 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
     if (!content) return;
 
     setDashboardError('');
+    if (simulationMode) {
+      const newRequest: PrayerRequest = {
+        id: `preview-prayer-${Date.now()}`,
+        studentId: currentUser.id,
+        studentName: currentUser.name,
+        content,
+        isPrivate: prayerIsPrivate,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      setPrayerRequests((previous) => [newRequest, ...previous]);
+      setPrayerContent('');
+      setPrayerSentMessage('تمت إضافة طلب الصلاة في وضع المحاكاة فقط؛ لم تُرسل بيانات إلى قاعدة البيانات.');
+      window.setTimeout(() => setPrayerSentMessage(''), 4000);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('prayer_requests')
       .insert({
