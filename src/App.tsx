@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, fetchUserProfile } from './lib/supabase';
-import type { User } from './types';
+import type { User, UserRole } from './types';
 import { NavigationTaskbar, type AppScreen } from './components/NavigationTaskbar';
 import { GetStartedScreen } from './screens/GetStartedScreen';
 import { LoginScreen } from './screens/LoginScreen';
@@ -11,12 +11,19 @@ import { StudentDashboardScreen } from './screens/StudentDashboardScreen';
 import { ServantDashboardScreen } from './screens/ServantDashboardScreen';
 import { SupabaseScreen } from './screens/SupabaseScreen';
 import { Database } from './db/storage';
+import { TestDashboardScreen } from './screens/TestDashboardScreen';
+import { TestRoleSwitcher } from './components/TestRoleSwitcher';
+import { startTestRuntimeLogCapture } from './lib/testRuntimeLogs';
 
 const dashboardFor = (user: User): AppScreen =>
   user.role === 'student' ? 'student-dashboard' : 'servant-dashboard';
 
+const authenticatedHomeFor = (user: User): AppScreen =>
+  user.role === 'test' ? 'test' : dashboardFor(user);
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [previewRole, setPreviewRole] = useState<UserRole | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('get-started');
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => window.location.search.includes('password-reset=1'));
   const [theme, setTheme] = useState<'light' | 'dark'>(() => Database.getTheme());
@@ -25,6 +32,10 @@ export default function App() {
   useEffect(() => {
     Database.setTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    startTestRuntimeLogCapture();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -49,17 +60,19 @@ export default function App() {
         setCurrentUser(profile);
         setSessionReady(true);
         if (navigateToDashboard) {
-          setCurrentScreen(dashboardFor(profile));
+          setPreviewRole(null);
+          setCurrentScreen(authenticatedHomeFor(profile));
         } else {
-          // Re-route an open dashboard when a head changes this account's role.
-          // RLS protects the data immediately; this refresh updates the visible UI too.
-          setCurrentScreen((previousScreen) =>
-            previousScreen === 'dashboard' ||
-            previousScreen === 'student-dashboard' ||
-            previousScreen === 'servant-dashboard'
-              ? dashboardFor(profile)
-              : previousScreen
-          );
+          // Keep TEST role previews stable while auth hydration confirms the real TEST account.
+          // For normal accounts, reflect role/grade changes in the open dashboard.
+          setCurrentScreen((previousScreen) => {
+            if (profile.role === 'test') return previousScreen;
+            return previousScreen === 'dashboard' ||
+              previousScreen === 'student-dashboard' ||
+              previousScreen === 'servant-dashboard'
+                ? dashboardFor(profile)
+                : previousScreen;
+          });
         }
       } catch (error) {
         console.error('Unable to load the authenticated Masiri profile:', error);
@@ -125,17 +138,20 @@ export default function App() {
       return;
     }
     setCurrentUser(null);
+    setPreviewRole(null);
     setCurrentScreen('get-started');
   };
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
-    setCurrentScreen(dashboardFor(user));
+    setPreviewRole(null);
+    setCurrentScreen(authenticatedHomeFor(user));
   };
 
   const handleSignUpSuccess = (user: User) => {
     setCurrentUser(user);
-    setCurrentScreen(dashboardFor(user));
+    setPreviewRole(null);
+    setCurrentScreen(authenticatedHomeFor(user));
   };
 
   const handleUpdateCurrentUser = (updated: User) => {
@@ -148,7 +164,18 @@ export default function App() {
         setCurrentScreen('login');
         return;
       }
-      setCurrentScreen(dashboardFor(currentUser));
+      if (currentUser.role === 'test' && !previewRole) {
+        setCurrentScreen('test');
+        return;
+      }
+      const targetRole = currentUser.role === 'test' && previewRole ? previewRole : currentUser.role;
+      setCurrentScreen(targetRole === 'student' ? 'student-dashboard' : 'servant-dashboard');
+      return;
+    }
+    if (screen === 'test') {
+      if (currentUser?.role !== 'test') return;
+      setPreviewRole(null);
+      setCurrentScreen('test');
       return;
     }
     if (screen === 'supabase' && currentUser?.role !== 'head') return;
@@ -159,12 +186,36 @@ export default function App() {
     setCurrentScreen(screen);
   };
 
+  const handlePreviewRoleSelection = (role: UserRole | null) => {
+    if (currentUser?.role !== 'test') return;
+    setPreviewRole(role);
+    if (!role) {
+      setCurrentScreen('test');
+      return;
+    }
+    const previewUser: User = {
+      ...currentUser,
+      role,
+      gradeLevel: role === 'student' || role === 'teacher'
+        ? currentUser.gradeLevel ?? 'grade-1'
+        : undefined,
+    };
+    setCurrentScreen(dashboardFor(previewUser));
+  };
+
   const renderDashboard = () => {
     if (!currentUser) return null;
-    if (currentUser.role === 'student') {
+    const displayUser: User = currentUser.role === 'test' && previewRole ? {
+      ...currentUser,
+      role: previewRole,
+      gradeLevel: previewRole === 'student' || previewRole === 'teacher'
+        ? currentUser.gradeLevel ?? 'grade-1'
+        : undefined,
+    } : currentUser;
+    if (displayUser.role === 'student') {
       return (
         <StudentDashboardScreen
-          currentUser={currentUser}
+          currentUser={displayUser}
           onUpdateUser={handleUpdateCurrentUser}
           theme={theme}
         />
@@ -172,7 +223,7 @@ export default function App() {
     }
     return (
       <ServantDashboardScreen
-        currentUser={currentUser}
+        currentUser={displayUser}
         onNavigate={handleNavigate}
         theme={theme}
       />
@@ -204,6 +255,10 @@ export default function App() {
         />
       </div>
 
+      {currentUser?.role === 'test' && (
+        <TestRoleSwitcher activeRole={previewRole} onSelect={handlePreviewRoleSelection} theme={theme} />
+      )}
+
       <main className="relative z-10 min-w-0 flex-1 pb-28 md:pb-8">
         {!sessionReady ? (
           <div className="flex min-h-[55vh] items-center justify-center px-6 text-sm" style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
@@ -227,6 +282,7 @@ export default function App() {
             {currentScreen === 'signup' && (
               <SignUpScreen onSignUpSuccess={handleSignUpSuccess} onNavigate={handleNavigate} theme={theme} />
             )}
+            {currentScreen === 'test' && currentUser?.role === 'test' && <TestDashboardScreen theme={theme} />}
             {currentScreen === 'profile' && (
               <ProfileScreen
                 currentUser={currentUser}
@@ -235,7 +291,16 @@ export default function App() {
                 theme={theme}
               />
             )}
-            {(currentScreen === 'dashboard' || currentScreen === 'student-dashboard' || currentScreen === 'servant-dashboard') && renderDashboard()}
+            {(currentScreen === 'dashboard' || currentScreen === 'student-dashboard' || currentScreen === 'servant-dashboard') && (
+              previewRole ? (
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-x-4 top-4 z-20 mx-auto max-w-2xl rounded-2xl border p-3 text-center text-xs font-bold shadow-lg" style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.45)' : '#DFC0CA', background: theme === 'dark' ? 'rgba(32,24,34,.95)' : 'rgba(255,255,255,.96)', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
+                    وضع معاينة للقراءة فقط — قاعدة البيانات ما زالت تتعامل مع حساب TEST الحقيقي
+                  </div>
+                  <div inert className="pointer-events-none select-none opacity-80" aria-label="معاينة واجهة للقراءة فقط">{renderDashboard()}</div>
+                </div>
+              ) : renderDashboard()
+            )}
             {currentScreen === 'supabase' && currentUser?.role === 'head' && <SupabaseScreen theme={theme} />}
           </>
         )}
