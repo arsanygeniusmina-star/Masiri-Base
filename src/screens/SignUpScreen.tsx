@@ -81,22 +81,31 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
 
       if (error || !data.user) {
         const reason = error?.message;
-        setErrorMsg(reason
+        const message = reason
           ? `تعذر إنشاء الحساب: ${reason}`
-          : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.');
+          : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.';
+        console.error('Masiri signup rejected by Supabase Auth:', error ?? 'No user returned');
+        setErrorMsg(message);
+        // Native fallback ensures errors remain visible even if an installed PWA
+        // is holding an outdated React view or styling bundle.
+        window.alert(message);
         return;
       }
 
       if (!data.session) {
+        const message = 'تم إنشاء الحساب، لكن يلزم تأكيد البريد الإلكتروني أولاً. افتح رسالة التأكيد في بريدك، ثم ارجع إلى مسيري وسجّل الدخول. لن نفتح الملف الشخصي قبل اكتمال التحقق من الحساب.';
         setRequiresEmailConfirmation(true);
-        setSuccessMsg('تم إنشاء الحساب، لكن يلزم تأكيد البريد الإلكتروني أولاً. افتح رسالة التأكيد في بريدك، ثم ارجع إلى مسيري وسجّل الدخول. لن نفتح الملف الشخصي قبل اكتمال التحقق من الحساب.');
+        setSuccessMsg(message);
+        window.alert(message);
         return;
       }
 
       const profile = await fetchUserProfile(data.user.id);
       if (!profile) {
         await supabase.auth.signOut();
-        setErrorMsg('تم إنشاء حساب الدخول لكن ملف مسيري لم يظهر بعد. تواصل مع مسؤول التطبيق قبل إعادة المحاولة.');
+        const message = 'تم إنشاء حساب الدخول لكن ملف مسيري لم يظهر بعد. تواصل مع مسؤول التطبيق قبل إعادة المحاولة.';
+        setErrorMsg(message);
+        window.alert(message);
         return;
       }
 
@@ -104,7 +113,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     } catch (error) {
       console.error('Masiri sign-up failed:', error);
       const detail = error instanceof Error ? error.message : String(error);
-      setErrorMsg(`حدث خطأ أثناء إنشاء الحساب أو الاتصال بقاعدة البيانات: ${detail}`);
+      const message = `حدث خطأ أثناء إنشاء الحساب أو الاتصال بقاعدة البيانات: ${detail}`;
+      setErrorMsg(message);
+      window.alert(message);
     } finally {
       setIsLoading(false);
     }
