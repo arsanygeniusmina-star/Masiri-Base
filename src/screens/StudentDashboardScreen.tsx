@@ -34,6 +34,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
 }) => {
   const [tasks, setTasks] = useState<DailySpiritualTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
+  const [simulationPoints, setSimulationPoints] = useState(0);
   const [dashboardError, setDashboardError] = useState('');
   const [verse] = useState<MemoryVerse>(CURRENT_WEEK_VERSE);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -47,6 +48,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
     let cancelled = false;
     if (simulationMode) {
       setDashboardError('');
+      setSimulationPoints(currentUser.points);
       setTasks([
         { id: 'preview-task-prayer', title: 'صلاة الصباح', subtitle: 'ابدأ يومك بالشكر والصلاة', category: 'prayer', points: 10, completed: false },
         { id: 'preview-task-bible', title: 'قراءة الإنجيل', subtitle: 'اقرأ الإصحاح المحدد لهذا الأسبوع', category: 'bible', points: 15, completed: false },
@@ -133,8 +135,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
     if (simulationMode) {
       const updatedTasks = tasks.map((item) => item.id === taskId ? { ...item, completed: nextCompleted } : item);
       setTasks(updatedTasks);
-      // Keep the app's real identity as TEST; the selected role is only a simulated view.
-      onUpdateUser({ ...currentUser, role: 'test', points: Math.max(0, currentUser.points + (nextCompleted ? task.points : -task.points)) });
+      setSimulationPoints((points) => Math.max(0, points + (nextCompleted ? task.points : -task.points)));
       const completedTasks = updatedTasks.filter((item) => item.completed).length;
       setBadges(Database.getBadges().map((badge, index) => ({ ...badge, isUnlocked: index < completedTasks })));
       if (updatedTasks.length > 0 && updatedTasks.every((item) => item.completed)) {
@@ -388,7 +389,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
               <span>نقاطي</span>
             </div>
             <p className="text-2xl font-black font-mono mt-1" style={{ color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
-              {currentUser.points}
+              {simulationMode ? simulationPoints : currentUser.points}
             </p>
           </div>
         </div>
