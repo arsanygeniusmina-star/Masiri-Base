@@ -273,7 +273,7 @@ export default function App() {
     : currentUser;
 
   const renderDashboard = () => {
-    if (!displayUser) return null;
+    if (!displayUser || !currentUser) return null;
     if (displayUser.role === 'student') {
       return (
         <StudentDashboardScreen
