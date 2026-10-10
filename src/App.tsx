@@ -13,6 +13,7 @@ import { SupabaseScreen } from './screens/SupabaseScreen';
 import { Database } from './db/storage';
 import { TestDashboardScreen } from './screens/TestDashboardScreen';
 import { TestRoleSwitcher } from './components/TestRoleSwitcher';
+import { JourneyTransition } from './components/JourneyTransition';
 import { startTestRuntimeLogCapture } from './lib/testRuntimeLogs';
 
 const dashboardFor = (user: User): AppScreen =>
@@ -28,10 +29,28 @@ export default function App() {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => window.location.search.includes('password-reset=1'));
   const [theme, setTheme] = useState<'light' | 'dark'>(() => Database.getTheme());
   const [sessionReady, setSessionReady] = useState(false);
+  const [journeyTransitionUser, setJourneyTransitionUser] = useState<User | null>(null);
 
   useEffect(() => {
     Database.setTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!journeyTransitionUser) return;
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setCurrentScreen(authenticatedHomeFor(journeyTransitionUser));
+      setJourneyTransitionUser(null);
+      return;
+    }
+
+    const transitionTimer = window.setTimeout(() => {
+      setCurrentScreen(authenticatedHomeFor(journeyTransitionUser));
+      setJourneyTransitionUser(null);
+    }, 4300);
+
+    return () => window.clearTimeout(transitionTimer);
+  }, [journeyTransitionUser]);
 
   useEffect(() => {
     if (currentUser?.role === 'test') startTestRuntimeLogCapture();
@@ -61,7 +80,18 @@ export default function App() {
         setSessionReady(true);
         if (navigateToDashboard) {
           setPreviewRole(null);
-          setCurrentScreen(authenticatedHomeFor(profile));
+          let animateAfterOAuth = false;
+          try {
+            animateAfterOAuth = window.sessionStorage.getItem('masiri.auth-transition-after-oauth') === '1';
+            if (animateAfterOAuth) window.sessionStorage.removeItem('masiri.auth-transition-after-oauth');
+          } catch {
+            // Storage may be unavailable in restricted browser contexts; normal navigation still works.
+          }
+          if (animateAfterOAuth) {
+            setJourneyTransitionUser(profile);
+          } else {
+            setCurrentScreen(authenticatedHomeFor(profile));
+          }
         } else {
           // Keep TEST role previews stable while auth hydration confirms the real TEST account.
           // For normal accounts, reflect role/grade changes in the open dashboard.
@@ -88,10 +118,19 @@ export default function App() {
       void hydrateSession(data.session?.user.id ?? null, Boolean(data.session));
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Defer the profile query until Supabase has released its internal auth lock.
+      // The explicit login/signup handlers start the visual journey only after the
+      // credential check and profile lookup have both succeeded.
+      if (event === 'SIGNED_OUT') {
+        try {
+          window.sessionStorage.removeItem('masiri.auth-transition-after-oauth');
+        } catch {
+          // Ignore storage restrictions during sign-out.
+        }
+      }
       window.setTimeout(() => {
-        void hydrateSession(session?.user.id ?? null, Boolean(session));
+        void hydrateSession(session?.user.id ?? null, false);
       }, 0);
     });
 
@@ -145,13 +184,13 @@ export default function App() {
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     setPreviewRole(null);
-    setCurrentScreen(authenticatedHomeFor(user));
+    setJourneyTransitionUser(user);
   };
 
   const handleSignUpSuccess = (user: User) => {
     setCurrentUser(user);
     setPreviewRole(null);
-    setCurrentScreen(authenticatedHomeFor(user));
+    setJourneyTransitionUser(user);
   };
 
   const handleUpdateCurrentUser = (updated: User) => {
@@ -333,6 +372,7 @@ export default function App() {
           <span className="text-[11px]">جميع الحقوق محفوظة</span>
         </div>
       </footer>
+      {journeyTransitionUser && <JourneyTransition theme={theme} />}
     </div>
   );
 }

@@ -131,7 +131,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             }}
           >
             <img
-              src="/logo-family.jpg?v=20261010-1"
+              src="/masiri-journey-icon.jpg?v=20261010-2"
               alt="شعار مَسِيري"
               className="w-full h-full object-cover"
             />
