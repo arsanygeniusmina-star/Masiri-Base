@@ -540,6 +540,8 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
                     </label>
                     <select
                       value={gradeLevel}
+                      disabled
+                      aria-describedby="grade-level-help"
                       onChange={(e) => setGradeLevel(e.target.value as MiddleSchoolGrade)}
                       className="w-full px-3.5 py-2.5 rounded-2xl text-sm border focus:outline-none focus:ring-2 focus:ring-[#76243A] backdrop-blur-md"
                       style={{
@@ -552,6 +554,7 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
                       <option value="grade-2">الصف الثامن (تانية إعدادي / 8th Grade)</option>
                       <option value="grade-3">الصف التاسع (تالتة إعدادي / 9th Grade)</option>
                     </select>
+                    <p id="grade-level-help" className="text-[11px] text-[#77717A] dark:text-[#B8B1BB]">يتم تحديد المرحلة الدراسية من بيانات التسجيل واعتماد الخدمة.</p>
                   </div>
                 )}
 
@@ -686,7 +689,7 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
               <p className="text-sm leading-relaxed text-[#77717A] dark:text-[#B8B1BB]">
                 الخادم الفصلي يمتلك كل أدوات إدارة ومتابعة الطلاب تماماً كأمين الخدمة، إلا أنه{' '}
                 <strong className="text-[#76243A] dark:text-[#B65370]">لا يستطيع إضافة خدام آخرين</strong>. فقط أمين الخدمة العام (
-                <span className="font-mono font-bold" dir="ltr">{HEAD_EMAIL_DEFAULT}</span>) يملك حق إضافة واعتماد المعلمين الجدد.
+                <span className="font-mono font-bold" dir="ltr">أمين الخدمة العام</span>) يملك حق إضافة واعتماد المعلمين الجدد.
               </p>
             </div>
           ) : (
