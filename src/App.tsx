@@ -280,7 +280,7 @@ export default function App() {
           currentUser={displayUser}
           onUpdateUser={handleUpdateCurrentUser}
           theme={theme}
-          simulationMode={simulationMode}
+          simulationMode={currentUser.role === 'test' && Boolean(previewRole)}
         />
       );
     }
@@ -289,7 +289,7 @@ export default function App() {
         currentUser={displayUser}
         onNavigate={handleNavigate}
         theme={theme}
-        simulationMode={simulationMode}
+        simulationMode={currentUser.role === 'test' && Boolean(previewRole)}
       />
     );
   };
