@@ -323,13 +323,11 @@ export default function App() {
           </div>
           <span className="text-[11px]">«لاَ يَمْنَعْكَ صِبَاكَ مِنْ أَنْ تَكُونَ قُدْوَةً لِلْمُؤْمِنِينَ» (١ تيموثاوس ٤: ١٢)</span>
           <img
-            src={theme === 'dark' ? '/logo-church-dark.png?v=20261010-2' : '/logo-church-light.png?v=20261010-2'}
+            src={theme === 'dark' ? '/logo-church-dark.png?v=20261010-2' : '/logo-church-light.png?v=20261010-3'}
             alt="شعار الكنيسة"
             className="h-auto w-[170px] max-w-full object-contain"
             style={{
-              filter: theme === 'dark'
-                ? 'contrast(1.1) brightness(1.12)'
-                : 'contrast(1.4) saturate(1.55) brightness(0.72)',
+              filter: theme === 'dark' ? 'contrast(1.1) brightness(1.12)' : 'none',
             }}
           />
           <span className="text-[11px]">جميع الحقوق محفوظة</span>
