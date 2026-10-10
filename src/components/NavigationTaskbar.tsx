@@ -22,7 +22,8 @@ export type AppScreen =
   | 'dashboard'
   | 'student-dashboard'
   | 'servant-dashboard'
-  | 'supabase';
+  | 'supabase'
+  | 'test';
 
 interface NavigationTaskbarProps {
   currentScreen: AppScreen;
@@ -50,6 +51,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
 }) => {
   const isHead = currentUser?.role === 'head';
   const isTeacher = currentUser?.role === 'teacher';
+  const isTest = currentUser?.role === 'test';
   const isDashboard = currentScreen === 'dashboard' ||
     currentScreen === 'student-dashboard' ||
     currentScreen === 'servant-dashboard';
@@ -64,6 +66,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
         ]
       : [{ id: 'profile' as const, label: 'حسابي', icon: UserIcon }]),
     ...(isHead ? [{ id: 'supabase' as const, label: 'قاعدة البيانات', icon: Database }] : []),
+    ...(isTest ? [{ id: 'test' as const, label: 'مركز الاختبار', icon: Database }] : []),
   ];
 
   // The phone taskbar is deliberately compact. Session controls stay reachable
@@ -74,6 +77,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
         { id: 'dashboard', label: 'رحلتي', icon: LayoutDashboard },
         { id: 'profile', label: 'حسابي', icon: UserIcon },
         ...(isHead ? [{ id: 'supabase' as const, label: 'البيانات', icon: Database }] : []),
+        ...(isTest ? [{ id: 'test' as const, label: 'اختبار', icon: Database }] : []),
         { id: 'logout', label: 'خروج', icon: LogOut, action: 'logout' },
       ]
     : [
@@ -200,7 +204,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
                 <span className="max-w-full truncate text-sm font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>{currentUser.name}</span>
                 <span className="flex items-center gap-1 text-[10px]" style={{ color: theme === 'dark' ? '#D6B878' : '#77717A' }}>
                   {isHead ? <ShieldCheck className="h-3 w-3" /> : isTeacher ? <Sparkles className="h-3 w-3" /> : null}
-                  {isHead ? 'أمين الخدمة' : isTeacher ? 'خادم فصلي' : 'طالب إعدادي'}
+                  {isHead ? 'أمين الخدمة' : isTeacher ? 'خادم فصلي' : isTest ? 'اختبار داخلي' : 'طالب إعدادي'}
                 </span>
               </span>
             )}
@@ -224,7 +228,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
       {/* Fixed phone bottom navigation with safe-area inset for iOS / Android gesture areas */}
       <nav
         aria-label="التنقل السفلي"
-        className={`fixed inset-x-0 bottom-0 z-50 grid ${currentUser?.role === 'head' ? 'grid-cols-5' : 'grid-cols-4'} gap-1 border-t px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_28px_rgba(20,17,23,.10)] backdrop-blur-3xl md:hidden`}
+        className={`fixed inset-x-0 bottom-0 z-50 grid ${currentUser?.role === 'head' || currentUser?.role === 'test' ? 'grid-cols-5' : 'grid-cols-4'} gap-1 border-t px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_28px_rgba(20,17,23,.10)] backdrop-blur-3xl md:hidden`}
         style={{
           backgroundColor: theme === 'dark' ? 'rgba(24,20,27,.94)' : 'rgba(255,255,255,.94)',
           borderColor: theme === 'dark' ? 'rgba(214,184,120,.22)' : '#E7E2E0',
