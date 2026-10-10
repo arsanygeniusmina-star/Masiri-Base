@@ -3,7 +3,7 @@
  * Church Middle School Ministry Platform
  */
 
-export type UserRole = 'head' | 'teacher' | 'student';
+export type UserRole = 'head' | 'teacher' | 'student' | 'test';
 
 export type MiddleSchoolGrade = 'grade-1' | 'grade-2' | 'grade-3';
 
