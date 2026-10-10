@@ -38,6 +38,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [requiresEmailConfirmation, setRequiresEmailConfirmation] = useState(false);
+  const [submitFeedback, setSubmitFeedback] = useState<{ tone: 'info' | 'success' | 'error'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const cleanEmail = email.trim().toLowerCase();
@@ -51,21 +52,29 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
     setRequiresEmailConfirmation(false);
+    setSubmitFeedback(null);
 
     if (!name.trim()) {
-      setErrorMsg('يرجى إدخال الاسم كاملاً.');
+      const message = 'يرجى إدخال الاسم كاملاً.';
+      setErrorMsg(message);
+      setSubmitFeedback({ tone: 'error', text: message });
       return;
     }
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      setErrorMsg('يرجى إدخال بريد إلكتروني صالح.');
+      const message = 'يرجى إدخال بريد إلكتروني صالح.';
+      setErrorMsg(message);
+      setSubmitFeedback({ tone: 'error', text: message });
       return;
     }
     if (password.length < 8) {
-      setErrorMsg('يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.');
+      const message = 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.';
+      setErrorMsg(message);
+      setSubmitFeedback({ tone: 'error', text: message });
       return;
     }
 
     setIsLoading(true);
+    setSubmitFeedback({ tone: 'info', text: 'تم الضغط على زر التسجيل. جارٍ الاتصال بخادم الحسابات...' });
     try {
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
@@ -86,9 +95,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.';
         console.error('Masiri signup rejected by Supabase Auth:', error ?? 'No user returned');
         setErrorMsg(message);
-        // Native fallback ensures errors remain visible even if an installed PWA
-        // is holding an outdated React view or styling bundle.
-        window.alert(message);
+        setSubmitFeedback({ tone: 'error', text: message });
         return;
       }
 
@@ -96,26 +103,28 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
         const message = 'تم إنشاء الحساب، لكن يلزم تأكيد البريد الإلكتروني أولاً. افتح رسالة التأكيد في بريدك، ثم ارجع إلى مسيري وسجّل الدخول. لن نفتح الملف الشخصي قبل اكتمال التحقق من الحساب.';
         setRequiresEmailConfirmation(true);
         setSuccessMsg(message);
-        window.alert(message);
+        setSubmitFeedback({ tone: 'success', text: message });
         return;
       }
 
+      setSubmitFeedback({ tone: 'info', text: 'تم تسجيل الدخول بنجاح. جارٍ تحميل الملف الشخصي...' });
       const profile = await fetchUserProfile(data.user.id);
       if (!profile) {
         await supabase.auth.signOut();
         const message = 'تم إنشاء حساب الدخول لكن ملف مسيري لم يظهر بعد. تواصل مع مسؤول التطبيق قبل إعادة المحاولة.';
         setErrorMsg(message);
-        window.alert(message);
+        setSubmitFeedback({ tone: 'error', text: message });
         return;
       }
 
+      setSubmitFeedback({ tone: 'success', text: 'تم إنشاء الحساب بنجاح. جارٍ فتح الملف الشخصي...' });
       onSignUpSuccess(profile);
     } catch (error) {
       console.error('Masiri sign-up failed:', error);
       const detail = error instanceof Error ? error.message : String(error);
       const message = `حدث خطأ أثناء إنشاء الحساب أو الاتصال بقاعدة البيانات: ${detail}`;
       setErrorMsg(message);
-      window.alert(message);
+      setSubmitFeedback({ tone: 'error', text: message });
     } finally {
       setIsLoading(false);
     }
@@ -483,6 +492,36 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               </>
             )}
           </button>
+
+          {submitFeedback && (
+            <div
+              role={submitFeedback.tone === 'error' ? 'alert' : 'status'}
+              aria-live={submitFeedback.tone === 'error' ? 'assertive' : 'polite'}
+              className="mt-3 rounded-2xl border px-4 py-3.5 text-sm leading-relaxed break-words"
+              style={{
+                backgroundColor: submitFeedback.tone === 'error'
+                  ? (theme === 'dark' ? 'rgba(75, 28, 38, 0.86)' : '#FCEBEC')
+                  : submitFeedback.tone === 'success'
+                    ? (theme === 'dark' ? 'rgba(32, 53, 42, 0.86)' : '#E9F4EC')
+                    : (theme === 'dark' ? 'rgba(39, 34, 44, 0.92)' : '#F6F0E3'),
+                color: submitFeedback.tone === 'error'
+                  ? (theme === 'dark' ? '#FFB3B8' : '#912C3B')
+                  : submitFeedback.tone === 'success'
+                    ? (theme === 'dark' ? '#75C695' : '#286844')
+                    : (theme === 'dark' ? '#F3DEAB' : '#765A22'),
+                borderColor: submitFeedback.tone === 'error'
+                  ? (theme === 'dark' ? 'rgba(240, 128, 137, 0.42)' : '#E7B6BE')
+                  : submitFeedback.tone === 'success'
+                    ? (theme === 'dark' ? '#3A3540' : '#B8D7C1')
+                    : (theme === 'dark' ? 'rgba(214,184,120,.35)' : 'rgba(197,161,90,.45)'),
+              }}
+            >
+              <p className="font-extrabold">
+                {submitFeedback.tone === 'error' ? 'لم يكتمل التسجيل' : submitFeedback.tone === 'success' ? 'تمت الاستجابة' : 'حالة التسجيل'}
+              </p>
+              <p className="mt-1">{submitFeedback.text}</p>
+            </div>
+          )}
         </form>
 
         {/* Footer */}
