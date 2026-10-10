@@ -54,13 +54,8 @@ export default defineConfig(() => {
               type: 'image/jpeg',
               purpose: 'any',
             },
-            {
-              src: '/logo-family.jpg',
-              sizes: '512x512',
-              type: 'image/jpeg',
-              purpose: 'maskable',
-            },
-          ],        },
+          ],
+        },
         devOptions: {
           enabled: false,
         },
