@@ -111,8 +111,8 @@ export const TestDashboardScreen: React.FC<TestDashboardScreenProps> = ({ theme 
             </div>
             <h1 className="text-2xl font-black sm:text-3xl" style={{ color: primary }}>مركز الاختبار والتشخيص</h1>
             <p className="max-w-3xl text-sm leading-7" style={{ color: secondary }}>
-              لوحة داخلية لعرض أخطاء المتصفح، ومعلومات اتصال Supabase، وأسماء الجداول وأعمدتها وعينات من السجلات.
-              صلاحية القراءة هنا لا تغيّر أدوار الحسابات ولا تمنح صلاحيات الكتابة في قاعدة البيانات.
+              لوحة داخلية لعرض أخطاء المتصفح، ومعلومات اتصال Supabase، وأسماء الجداول وأعمدتها وأعداد السجلات فقط.
+              لا تعرض اللوحة عينات من سجلات الطلاب الحقيقية، ولا تغيّر أدوار الحسابات أو بيانات قاعدة البيانات.
             </p>
           </div>
           <button type="button" onClick={() => void refreshDiagnostics()} disabled={loading}
@@ -241,8 +241,14 @@ export const TestDashboardScreen: React.FC<TestDashboardScreenProps> = ({ theme 
                 ) : (
                   <div className="rounded-2xl border p-8 text-center" style={{ borderColor: border, background: card }}>
                     <Users className="mx-auto h-8 w-8" style={{ color: secondary }} />
-                    <p className="mt-2 text-sm font-bold" style={{ color: primary }}>لا توجد سجلات في هذا الجدول حالياً</p>
-                    <p className="mt-1 text-xs" style={{ color: secondary }}>يمكنك تحديث التشخيص بعد إضافة بيانات تجريبية أو حقيقية.</p>
+                    <p className="mt-2 text-sm font-bold" style={{ color: primary }}>
+                      {activeTable.row_count > 0 ? 'عينات السجلات الحقيقية محجوبة عن حساب TEST' : 'لا توجد سجلات في هذا الجدول حالياً'}
+                    </p>
+                    <p className="mt-1 text-xs leading-6" style={{ color: secondary }}>
+                      {activeTable.row_count > 0
+                        ? 'استخدم وضع المحاكاة التفاعلي لتجربة الواجهة ببيانات تجريبية؛ لن تُعرض أسماء الطلاب أو أرقام هواتفهم أو نصوص طلبات الصلاة.'
+                        : 'يعرض هذا القسم بنية الجدول وأعداد السجلات فقط.'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -290,7 +296,7 @@ export const TestDashboardScreen: React.FC<TestDashboardScreenProps> = ({ theme 
       </section>
 
       <p className="px-2 text-xs leading-6" style={{ color: secondary }}>
-        تنبيه خصوصية: يتيح هذا الحساب قراءة البيانات التي يعرضها قسم التشخيص، بما في ذلك بيانات المستخدمين وطلبات الصلاة. سجلات المتصفح لا تتضمن كلمات مرور، ويتم تنقيح عناوين البريد الإلكتروني والرموز الشائعة قبل عرض رسائل السجل. لا تعرض هذه اللوحة auth.users أو المخطط الخاص أو المفاتيح السرية.
+        تنبيه خصوصية: يعرض التشخيص بنية الجداول وأعداد السجلات فقط، ولا يتيح لحساب TEST قراءة ملفات الطلاب أو أرقام هواتفهم أو نصوص طلبات الصلاة الحقيقية. سجل المتصفح محلي داخل الجلسة، ويتم تنقيح عناوين البريد الإلكتروني والرموز الشائعة قبل عرض رسائل السجل. لا تعرض هذه اللوحة auth.users أو المخطط الخاص أو المفاتيح السرية.
       </p>
     </div>
   );
