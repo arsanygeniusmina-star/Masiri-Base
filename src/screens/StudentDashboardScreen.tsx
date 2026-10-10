@@ -23,12 +23,14 @@ interface StudentDashboardScreenProps {
   currentUser: User;
   onUpdateUser: (updated: User) => void;
   theme: 'light' | 'dark';
+  simulationMode?: boolean;
 }
 
 export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
   currentUser,
   onUpdateUser,
   theme,
+  simulationMode = false,
 }) => {
   const [tasks, setTasks] = useState<DailySpiritualTask[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
@@ -43,6 +45,27 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
 
   useEffect(() => {
     let cancelled = false;
+    if (simulationMode) {
+      setDashboardError('');
+      setTasks([
+        { id: 'preview-task-prayer', title: 'صلاة الصباح', subtitle: 'ابدأ يومك بالشكر والصلاة', category: 'prayer', points: 10, completed: false },
+        { id: 'preview-task-bible', title: 'قراءة الإنجيل', subtitle: 'اقرأ الإصحاح المحدد لهذا الأسبوع', category: 'bible', points: 15, completed: false },
+        { id: 'preview-task-verse', title: 'حفظ آية الأسبوع', subtitle: 'راجع الآية ومرجعها', category: 'verse', points: 20, completed: false },
+        { id: 'preview-task-kindness', title: 'عمل محبة', subtitle: 'ساعد شخصاً اليوم بمحبة', category: 'kindness', points: 10, completed: false },
+      ]);
+      setBadges(Database.getBadges().map((badge, index) => ({ ...badge, isUnlocked: index === 0 })));
+      setPrayerRequests([{
+        id: 'preview-prayer-existing',
+        studentId: currentUser.id,
+        studentName: currentUser.name,
+        content: 'أرجو الصلاة من أجل عائلتي ونجاحي في الدراسة.',
+        isPrivate: true,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      }]);
+      setTasksLoading(false);
+      return () => { cancelled = true; };
+    }
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
@@ -91,7 +114,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
 
     void loadDashboard();
     return () => { cancelled = true; };
-  }, [currentUser.id]);
+  }, [currentUser.id, currentUser.name, simulationMode]);
 
   const [showConfettiNotice, setShowConfettiNotice] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState<AchievementBadge | null>(null);
