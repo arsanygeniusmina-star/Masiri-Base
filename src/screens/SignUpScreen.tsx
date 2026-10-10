@@ -13,7 +13,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { Database } from '../db/storage';
+import { supabase, fetchUserProfile } from '../lib/supabase';
 import { User, MiddleSchoolGrade } from '../types';
 import { AppScreen } from '../components/NavigationTaskbar';
 import { BrandSpinner, FormLoadingOverlay } from '../components/BrandLoadingSkeleton';
@@ -36,18 +36,17 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [phone, setPhone] = useState('');
   const [gradeLevel, setGradeLevel] = useState<MiddleSchoolGrade>('grade-2');
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Dynamic live email role analysis as requested by the user
-  const cleanEmail = email.trim().toLowerCase();
-  const isHead = cleanEmail ? Database.isHeadEmail(cleanEmail) : false;
-  const isTeacher = cleanEmail ? Database.isEmailWhitelistedForTeacher(cleanEmail) : false;
-  // If email is recognized as a student (any email that is NOT head and NOT whitelisted teacher)
-  const isStudent = !isHead && !isTeacher;
+  // Role is assigned by the database using the authenticated user's account
+  // and the server-managed teacher allowlist. Never infer privileges from a typed email.
+  const isStudent = true;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
 
     if (!name.trim()) {
       setErrorMsg('يرجى إدخال الاسم كاملاً.');
@@ -57,47 +56,49 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
       setErrorMsg('يرجى إدخال بريد إلكتروني صالح.');
       return;
     }
-    if (password.length < 4) {
-      setErrorMsg('كلمة المرور يجب ألا تقل عن 4 خانات.');
+    if (password.length < 8) {
+      setErrorMsg('يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.');
       return;
     }
 
     setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            name: name.trim(),
+            phone: phone.trim() || null,
+            grade_level: gradeLevel,
+          },
+        },
+      });
 
-    setTimeout(() => {
-      setIsLoading(false);
-
-      // Determine role according to user's specification:
-      // 1. Head if Head's email
-      // 2. Teacher if email added by Head
-      // 3. Student if unrecognized / normal email
-      let resolvedRole: 'head' | 'teacher' | 'student' = 'student';
-      if (isHead) {
-        resolvedRole = 'head';
-      } else if (isTeacher) {
-        resolvedRole = 'teacher';
-      } else {
-        resolvedRole = 'student';
+      if (error || !data.user) {
+        setErrorMsg(error?.message || 'تعذر إنشاء الحساب. تحقق من البيانات وحاول مرة أخرى.');
+        return;
       }
 
-      const newUser: User = {
-        id: `usr-${Date.now()}`,
-        name: name.trim(),
-        email: cleanEmail,
-        role: resolvedRole,
-        phone: phone.trim() || undefined,
-        churchName: 'كنيسة السيدة العذراء والشهيد مارمرقس',
-        // Middle school grade only saved if user is recognized as student
-        gradeLevel: resolvedRole === 'student' ? gradeLevel : undefined,
-        streakDays: 1,
-        points: resolvedRole === 'student' ? 150 : 600,
-        createdAt: new Date().toISOString(),
-      };
+      if (!data.session) {
+        setSuccessMsg('تم إنشاء الحساب. افتح رسالة التأكيد المرسلة إلى بريدك الإلكتروني، ثم ارجع وسجّل الدخول.');
+        return;
+      }
 
-      Database.saveUser(newUser);
-      Database.setCurrentUser(newUser);
-      onSignUpSuccess(newUser);
-    }, 320);
+      const profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        await supabase.auth.signOut();
+        setErrorMsg('تم إنشاء حساب الدخول لكن ملف مسيري لم يظهر بعد. تواصل مع مسؤول التطبيق قبل إعادة المحاولة.');
+        return;
+      }
+
+      onSignUpSuccess(profile);
+    } catch (error) {
+      console.error('Masiri sign-up failed:', error);
+      setErrorMsg('حدث خطأ أثناء إنشاء الحساب أو الاتصال بقاعدة البيانات. حاول مرة أخرى.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -147,63 +148,36 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           </p>
         </div>
 
-        {/* Dynamic Email-Based Role Detection Badge */}
-        {cleanEmail && (
-          <div
-            className="p-4 rounded-2xl border text-xs text-right space-y-1 transition-all animate-in fade-in backdrop-blur-md"
-            style={{
-              backgroundColor: isHead
-                ? theme === 'dark' ? 'rgba(56, 35, 44, 0.75)' : 'rgba(243, 231, 235, 0.9)'
-                : isTeacher
-                ? theme === 'dark' ? 'rgba(52, 45, 32, 0.75)' : 'rgba(246, 240, 227, 0.9)'
-                : theme === 'dark' ? 'rgba(32, 53, 42, 0.75)' : 'rgba(233, 244, 236, 0.9)',
-              borderColor: isHead
-                ? theme === 'dark' ? '#69404D' : '#DFC0CA'
-                : isTeacher
-                ? theme === 'dark' ? '#D6B878' : '#C5A15A'
-                : theme === 'dark' ? '#3A3540' : '#DFC0CA',
-              color: isHead
-                ? theme === 'dark' ? '#B65370' : '#76243A'
-                : isTeacher
-                ? theme === 'dark' ? '#D6B878' : '#A96F19'
-                : theme === 'dark' ? '#75C695' : '#347653',
-            }}
-          >
-            <div className="font-bold flex items-center gap-1.5 text-xs">
-              {isHead && <ShieldCheck className="w-4 h-4" />}
-              {isTeacher && <Sparkles className="w-4 h-4" />}
-              {isStudent && <BookOpen className="w-4 h-4" />}
-
-              <span>
-                {isHead
-                  ? 'تم التعرّف على بريدك: أمين الخدمة العام (Head)'
-                  : isTeacher
-                  ? 'تم التعرّف على بريدك: خادم فصلي معتمد (Teacher)'
-                  : 'تم التعرّف على حسابك: طالب مرحلة إعدادية (Student)'}
-              </span>
-            </div>
-            <p className="text-[11px] leading-relaxed opacity-90">
-              {isHead
-                ? 'لديك الصلاحية الكاملة لإدارة الخدمة وإضافة إيميلات المعلمين.'
-                : isTeacher
-                ? 'تمت إضافة بريدك مسبقاً من قِبل أمين الخدمة العام للدخول كخادم فصلي.'
-                : 'أهلاً بك! حدد صفك الدراسي الإعدادي لمتابعة مسارك الروحي.'}
-            </p>
+        <div
+          className="rounded-2xl border p-4 text-right text-xs"
+          style={{
+            backgroundColor: theme === 'dark' ? 'rgba(52,45,32,.45)' : 'rgba(246,240,227,.7)',
+            borderColor: theme === 'dark' ? 'rgba(214,184,120,.3)' : 'rgba(197,161,90,.35)',
+            color: theme === 'dark' ? '#D6B878' : '#765A22',
+          }}
+        >
+          <div className="flex items-center gap-2 font-bold">
+            <ShieldCheck className="h-4 w-4 shrink-0" />
+            <span>تحديد الصلاحيات يتم بأمان من قاعدة البيانات</span>
           </div>
-        )}
+          <p className="mt-1 leading-relaxed opacity-90">
+            يتم اعتماد دور الطالب أو الخادم من سجلات الخدمة، ولا يمكن اختيار صلاحيات أمين الخدمة من نموذج التسجيل.
+          </p>
+        </div>
 
-        {/* Error notification */}
-        {errorMsg && (
+        {/* Success notification */}
+        {successMsg && (
           <div
-            className="p-3.5 rounded-2xl text-xs flex items-center gap-2"
+            role="status"
+            className="flex items-start gap-2 rounded-2xl border p-3.5 text-xs"
             style={{
-              backgroundColor: theme === 'dark' ? 'rgba(61, 36, 42, 0.75)' : '#F9E9EB',
-              color: theme === 'dark' ? '#F08089' : '#B33B49',
-              border: `1px solid ${theme === 'dark' ? '#69404D' : '#DFC0CA'}`,
+              backgroundColor: theme === 'dark' ? 'rgba(32,53,42,.8)' : '#E9F4EC',
+              color: theme === 'dark' ? '#75C695' : '#347653',
+              borderColor: theme === 'dark' ? '#3A3540' : '#B8D7C1',
             }}
           >
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMsg}</span>
+            <ShieldCheck className="h-4 w-4 shrink-0" />
+            <span>{successMsg}</span>
           </div>
         )}
 
