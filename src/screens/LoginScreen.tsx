@@ -202,6 +202,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             ستظل جلسة الدخول محفوظة على هذا الجهاز حتى تسجيل الخروج.
           </p>
 
+          <button type="button" disabled={isLoading} onClick={async () => {
+            setErrorMsg('');
+            if (!cleanEmail || !cleanEmail.includes('@')) {
+              setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة المرور.');
+              return;
+            }
+            setIsLoading(true);
+            const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: window.location.origin });
+            setIsLoading(false);
+            setErrorMsg(error ? 'تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني.' : 'إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
+          }} className="w-full text-xs font-bold underline underline-offset-4" style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
+            نسيت كلمة المرور؟ إرسال رابط استعادة
+          </button>
+
           {/* Submit button with Church Burgundy & Gold in Dark Mode */}
           <button
             type="submit"
