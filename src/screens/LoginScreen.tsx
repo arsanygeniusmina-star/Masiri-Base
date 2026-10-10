@@ -209,7 +209,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               return;
             }
             setIsLoading(true);
-            const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: window.location.origin });
+            const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: `${window.location.origin}/?password-reset=1` });
             setIsLoading(false);
             setErrorMsg(error ? 'تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني.' : 'إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
           }} className="w-full text-xs font-bold underline underline-offset-4" style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}>
