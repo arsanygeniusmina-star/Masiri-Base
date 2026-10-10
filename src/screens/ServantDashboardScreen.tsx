@@ -27,6 +27,7 @@ interface ServantDashboardScreenProps {
   currentUser: User;
   onNavigate: (screen: AppScreen) => void;
   theme: 'light' | 'dark';
+  simulationMode?: boolean;
 }
 
 type TeacherApproval = {
@@ -48,6 +49,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   currentUser,
   onNavigate,
   theme,
+  simulationMode = false,
 }) => {
   const isHead = currentUser.role === 'head';
   const [students, setStudents] = useState<StudentRecord[]>([]);
@@ -79,6 +81,54 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
       setIsLoadingData(true);
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      if (simulationMode) {
+        const demoStudents: StudentRecord[] = [
+          { id: 'preview-student-1', name: 'مارك عماد رفعت', email: 'mark.student@example.test', gradeLevel: 'grade-1', churchFamily: 'عائلة مارك', spiritualFather: 'أبونا أنطونيوس', phone: '01000000001', attendanceRate: 92, points: 120, streakDays: 4, lastActive: now.toISOString(), teacherNotes: '' },
+          { id: 'preview-student-2', name: 'مينا فادي جرجس', email: 'mina.student@example.test', gradeLevel: 'grade-1', churchFamily: 'عائلة مينا', spiritualFather: 'أبونا بطرس', phone: '01000000002', attendanceRate: 84, points: 95, streakDays: 3, lastActive: now.toISOString(), teacherNotes: '' },
+          { id: 'preview-student-3', name: 'كيرلس سامح عادل', email: 'kyrillos.student@example.test', gradeLevel: 'grade-2', churchFamily: 'عائلة كيرلس', spiritualFather: 'أبونا أنطونيوس', phone: '01000000003', attendanceRate: 96, points: 210, streakDays: 6, lastActive: now.toISOString(), teacherNotes: '' },
+          { id: 'preview-student-4', name: 'بيشوي أمير فوزي', email: 'bishoy.student@example.test', gradeLevel: 'grade-2', churchFamily: 'عائلة بيشوي', spiritualFather: 'أبونا يوحنا', phone: '01000000004', attendanceRate: 78, points: 75, streakDays: 1, lastActive: now.toISOString(), teacherNotes: '' },
+          { id: 'preview-student-5', name: 'جورج بيتر عادل', email: 'george.student@example.test', gradeLevel: 'grade-3', churchFamily: 'عائلة جورج', spiritualFather: 'أبونا بطرس', phone: '01000000005', attendanceRate: 88, points: 180, streakDays: 5, lastActive: now.toISOString(), teacherNotes: '' },
+          { id: 'preview-student-6', name: 'فادي مينا سمير', email: 'fady.student@example.test', gradeLevel: 'grade-3', churchFamily: 'عائلة فادي', spiritualFather: 'أبونا أنطونيوس', phone: '01000000006', attendanceRate: 71, points: 60, streakDays: 0, lastActive: now.toISOString(), teacherNotes: '' },
+        ];
+        setStudents(isHead
+          ? demoStudents
+          : demoStudents.filter((student) => student.gradeLevel === (currentUser.gradeLevel ?? 'grade-1')));
+        setAttendanceToday({
+          'preview-student-1': 'present',
+          'preview-student-2': 'absent',
+          'preview-student-3': 'present',
+          'preview-student-4': 'excused',
+          'preview-student-5': 'present',
+          'preview-student-6': 'absent',
+        });
+        setAttendanceAverage(82);
+        setLatestPointReasons({
+          'preview-student-1': 'حفظ آية الأسبوع',
+          'preview-student-3': 'الالتزام والحضور',
+          'preview-student-5': 'مساعدة زميل',
+        });
+        setPrayerRequests([
+          { id: 'preview-prayer-1', studentId: 'preview-student-1', studentName: 'مارك عماد رفعت', content: 'أرجو الصلاة من أجل عائلتي.', isPrivate: false, status: 'pending', createdAt: now.toISOString() },
+          { id: 'preview-prayer-2', studentId: 'preview-student-3', studentName: 'كيرلس سامح عادل', content: 'أحتاج صلاة من أجل السلام والهدوء في الدراسة.', isPrivate: true, status: 'pending', createdAt: now.toISOString() },
+        ]);
+        if (isHead) {
+          const demoTeachers: TeacherApproval[] = [
+            { id: 'preview-teacher-1', email: 'anton.teacher@example.test', name: 'الخادم أنطونيوس', assigned_grade: 'grade-1', status: 'active' },
+            { id: 'preview-teacher-2', email: 'peter.teacher@example.test', name: 'الخادم بطرس', assigned_grade: 'grade-2', status: 'active' },
+            { id: 'preview-teacher-3', email: 'john.teacher@example.test', name: 'الخادم يوحنا', assigned_grade: 'grade-3', status: 'inactive' },
+          ];
+          setTeacherApprovals(demoTeachers);
+          setApprovedTeachersCount(demoTeachers.filter((row) => row.status === 'active' && row.assigned_grade).length);
+        } else {
+          setTeacherApprovals([]);
+          setApprovedTeachersCount(0);
+        }
+        setFeedbackToast('');
+        setIsLoadingData(false);
+        return;
+      }
+
       const [studentsResult, prayersResult, attendanceResult, pointsHistoryResult] = await Promise.all([
         supabase.from('users').select('*').eq('role', 'student').order('name'),
         supabase.from('prayer_requests').select('*').order('created_at', { ascending: false }),
@@ -150,7 +200,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
 
     void loadServantData();
     return () => { cancelled = true; };
-  }, [currentUser.id, currentUser.role]);
+  }, [currentUser.id, currentUser.role, currentUser.gradeLevel, simulationMode]);
 
   // Filter students
   const filteredStudents = students.filter((s) => {
