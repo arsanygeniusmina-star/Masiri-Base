@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   User as UserIcon,
   Mail,
@@ -18,6 +18,15 @@ import { User, MiddleSchoolGrade } from '../types';
 import { AppScreen } from '../components/NavigationTaskbar';
 import { BrandSpinner, FormLoadingOverlay } from '../components/BrandLoadingSkeleton';
 
+type SignupRole = 'student' | 'teacher' | 'head' | 'test';
+
+const signupRoleLabels: Record<SignupRole, string> = {
+  student: 'طالب',
+  teacher: 'خادم / معلم',
+  head: 'أمين الخدمة العام',
+  test: 'حساب اختبار',
+};
+
 interface SignUpScreenProps {
   onSignUpSuccess: (user: User) => void;
   onNavigate: (screen: AppScreen) => void;
@@ -35,15 +44,52 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [gradeLevel, setGradeLevel] = useState<MiddleSchoolGrade>('grade-2');
+  const [detectedRole, setDetectedRole] = useState<SignupRole | null>(null);
+  const [isDetectingRole, setIsDetectingRole] = useState(false);
+  const [roleDetectionError, setRoleDetectionError] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitFeedback, setSubmitFeedback] = useState<{ tone: 'info' | 'success' | 'error'; text: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const cleanEmail = email.trim().toLowerCase();
 
-  // Role is assigned by the database using the authenticated user's account
-  // and the server-managed teacher allowlist. Never infer privileges from a typed email.
-  const isStudent = true;
+  // This is only a UI hint. Final permissions are assigned by the database trigger,
+  // never by client-submitted role metadata.
+  const isStudent = detectedRole === 'student';
+
+  useEffect(() => {
+    const candidate = email.trim().toLowerCase();
+    let active = true;
+    setDetectedRole(null);
+    setRoleDetectionError('');
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate)) {
+      setIsDetectingRole(false);
+      return () => { active = false; };
+    }
+
+    setIsDetectingRole(true);
+    const timeout = window.setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.rpc('detect_signup_role', { p_email: candidate });
+        if (error) throw error;
+        if (!['student', 'teacher', 'head', 'test'].includes(String(data))) {
+          throw new Error('Unexpected signup role response');
+        }
+        if (active) setDetectedRole(data as SignupRole);
+      } catch (error) {
+        console.error('Unable to detect Masiri signup role:', error);
+        if (active) setRoleDetectionError('تعذر التعرف على نوع الحساب الآن. تحقق من الاتصال ثم حاول مجددًا.');
+      } finally {
+        if (active) setIsDetectingRole(false);
+      }
+    }, 400);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,8 +116,17 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     }
 
     setIsLoading(true);
-    setSubmitFeedback({ tone: 'info', text: 'تم الضغط على زر التسجيل. جارٍ الاتصال بخادم الحسابات...' });
+    setSubmitFeedback({ tone: 'info', text: 'جارٍ التحقق من نوع الحساب ثم إنشاء الحساب...' });
     try {
+      // Re-check on submit so a stale UI hint can never choose signup metadata.
+      const { data: roleData, error: roleError } = await supabase.rpc('detect_signup_role', { p_email: cleanEmail });
+      if (roleError) throw new Error('تعذر تحديد نوع الحساب من قاعدة البيانات. تحقق من الاتصال ثم أعد المحاولة.');
+      if (!['student', 'teacher', 'head', 'test'].includes(String(roleData))) {
+        throw new Error('تعذر تحديد نوع الحساب لهذا البريد الإلكتروني.');
+      }
+      const signupRole = roleData as SignupRole;
+      setDetectedRole(signupRole);
+
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
@@ -79,7 +134,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           data: {
             name: name.trim(),
             phone: phone.trim() || null,
-            grade_level: gradeLevel,
+            ...(signupRole === 'student' ? { grade_level: gradeLevel } : {}),
           },
         },
       });
@@ -269,6 +324,26 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 }}
               />
               <Mail className="w-4 h-4 text-[#77717A] dark:text-[#B8B1BB] absolute left-3.5 top-3.5 pointer-events-none" />
+            </div>
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-3 rounded-2xl border px-3.5 py-3 text-xs leading-relaxed"
+              style={{
+                backgroundColor: theme === 'dark' ? 'rgba(39,34,44,.72)' : 'rgba(246,240,227,.85)',
+                borderColor: theme === 'dark' ? 'rgba(214,184,120,.3)' : 'rgba(197,161,90,.38)',
+                color: theme === 'dark' ? '#F3DEAB' : '#765A22',
+              }}
+            >
+              {isDetectingRole ? (
+                <span>جارٍ التعرّف على نوع الحساب من قاعدة البيانات...</span>
+              ) : detectedRole ? (
+                <span>نوع الحساب المكتشف: <strong>{signupRoleLabels[detectedRole]}</strong>. الصلاحية النهائية تُعتمد من قاعدة البيانات.</span>
+              ) : roleDetectionError ? (
+                <span>{roleDetectionError}</span>
+              ) : (
+                <span>اكتب بريدًا إلكترونيًا كاملًا للتعرّف على نوع الحساب تلقائيًا.</span>
+              )}
             </div>
             <div className="flex items-center justify-between text-[11px] pt-1">
               <span className="text-[#77717A] dark:text-[#B8B1BB]">

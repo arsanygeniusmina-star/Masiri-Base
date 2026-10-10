@@ -38,6 +38,21 @@ type TeacherApproval = {
   status: string | null;
 };
 
+type ManagedRoleAccount = {
+  email: string;
+  name: string;
+  role: 'teacher' | 'head' | 'test';
+  assigned_grade: MiddleSchoolGrade | null;
+  status: string | null;
+  created_at?: string;
+};
+
+const roleAccountLabels: Record<ManagedRoleAccount['role'], string> = {
+  teacher: 'خادم / معلم',
+  head: 'أمين خدمة عام',
+  test: 'حساب اختبار',
+};
+
 const gradeLabel = (grade: MiddleSchoolGrade | null) => {
   if (grade === 'grade-1') return 'الصف السابع (أولى إعدادي)';
   if (grade === 'grade-2') return 'الصف الثامن (تانية إعدادي)';
@@ -59,6 +74,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [approvedTeachersCount, setApprovedTeachersCount] = useState(0);
   const [teacherApprovals, setTeacherApprovals] = useState<TeacherApproval[]>([]);
+  const [roleAccounts, setRoleAccounts] = useState<ManagedRoleAccount[]>([]);
   const [savingTeacherId, setSavingTeacherId] = useState<string | null>(null);
   const [awardingStudentId, setAwardingStudentId] = useState<string | null>(null);
   const [bonusPoints, setBonusPoints] = useState(25);
@@ -73,6 +89,8 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
   const [newTeacherEmail, setNewTeacherEmail] = useState('');
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherGrade, setNewTeacherGrade] = useState<MiddleSchoolGrade>('grade-2');
+  const [newAccountRole, setNewAccountRole] = useState<ManagedRoleAccount['role']>('teacher');
+  const [isAddingRoleAccount, setIsAddingRoleAccount] = useState(false);
   const [isSupabaseGuideOpen, setIsSupabaseGuideOpen] = useState(false);
 
   useEffect(() => {
@@ -120,9 +138,15 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
           ];
           setTeacherApprovals(demoTeachers);
           setApprovedTeachersCount(demoTeachers.filter((row) => row.status === 'active' && row.assigned_grade).length);
+          setRoleAccounts([
+            { email: 'head.preview@example.test', name: 'أمين خدمة تجريبي', role: 'head', assigned_grade: null, status: 'active', created_at: now.toISOString() },
+            { email: 'test.preview@example.test', name: 'حساب اختبار تجريبي', role: 'test', assigned_grade: null, status: 'active', created_at: now.toISOString() },
+            ...demoTeachers.map((row) => ({ ...row, role: 'teacher' as const, created_at: now.toISOString() })),
+          ]);
         } else {
           setTeacherApprovals([]);
           setApprovedTeachersCount(0);
+          setRoleAccounts([]);
         }
         setFeedbackToast('');
         setIsLoadingData(false);
@@ -147,6 +171,13 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
           const rows = (approvalRows || []) as TeacherApproval[];
           setTeacherApprovals(rows);
           setApprovedTeachersCount(rows.filter((row) => row.status === 'active' && row.assigned_grade).length);
+          const { data: managedRows, error: managedError } = await supabase.rpc('list_app_role_emails');
+          if (!cancelled && !managedError && Array.isArray(managedRows)) {
+            setRoleAccounts(managedRows as ManagedRoleAccount[]);
+          } else if (!cancelled && managedError) {
+            console.error('Unable to load managed role accounts:', managedError);
+            setFeedbackToast('تعذر تحميل قائمة الحسابات والصلاحيات.');
+          }
         } else if (!cancelled && approvalsError) {
           console.error('Unable to load teacher approvals:', approvalsError);
           setFeedbackToast('تعذر تحميل قائمة الخدام المعتمدين.');
@@ -283,64 +314,108 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
     window.setTimeout(() => setFeedbackToast(''), 3000);
   };
 
-  // The database RLS policy allows this insert only for the authenticated head account.
+  // Role assignment is validated server-side by an RPC that only a real Head can execute.
   const handleQuickAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isHead) return;
 
     const email = newTeacherEmail.trim().toLowerCase();
-    if (!email.includes('@')) {
+    const name = newTeacherName.trim() || (
+      newAccountRole === 'teacher' ? 'خادم جديد' :
+      newAccountRole === 'head' ? 'أمين خدمة جديد' : 'حساب اختبار'
+    );
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setFeedbackToast('يرجى إدخال بريد إلكتروني صحيح.');
       return;
     }
 
     if (simulationMode) {
-      if (teacherApprovals.some((teacher) => teacher.email.toLowerCase() === email)) {
+      if (roleAccounts.some((account) => account.email.toLowerCase() === email) ||
+          teacherApprovals.some((account) => account.email.toLowerCase() === email)) {
         setFeedbackToast('هذا البريد مسجل بالفعل في بيانات المحاكاة.');
         window.setTimeout(() => setFeedbackToast(''), 3000);
         return;
       }
-      const previewTeacher: TeacherApproval = {
-        id: `preview-teacher-${Date.now()}`,
+      const created: ManagedRoleAccount = {
         email,
-        name: newTeacherName.trim() || 'خادم جديد',
-        assigned_grade: newTeacherGrade,
+        name,
+        role: newAccountRole,
+        assigned_grade: newAccountRole === 'teacher' ? newTeacherGrade : null,
         status: 'active',
+        created_at: new Date().toISOString(),
       };
-      const nextApprovals = [previewTeacher, ...teacherApprovals];
-      setTeacherApprovals(nextApprovals);
-      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
-      setFeedbackToast('تمت إضافة الخادم في بيانات المحاكاة فقط؛ لم يتغير اعتماد حقيقي.');
+      setRoleAccounts((previous) => [created, ...previous]);
+      if (newAccountRole === 'teacher') {
+        const createdTeacher: TeacherApproval = {
+          id: 'preview-teacher-' + Date.now(),
+          email,
+          name,
+          assigned_grade: newTeacherGrade,
+          status: 'active',
+        };
+        setTeacherApprovals((previous) => [createdTeacher, ...previous]);
+        setApprovedTeachersCount((count) => count + 1);
+      }
+      setFeedbackToast('تمت إضافة الصلاحية في المحاكاة فقط؛ لم تتغير أي حسابات حقيقية.');
       setNewTeacherEmail('');
       setNewTeacherName('');
       setNewTeacherGrade('grade-2');
+      setNewAccountRole('teacher');
       setIsQuickAddModalOpen(false);
       window.setTimeout(() => setFeedbackToast(''), 3500);
       return;
     }
 
-    const { data, error } = await supabase.from('teachers_whitelist').insert({
-      email,
-      name: newTeacherName.trim() || 'خادم جديد',
-      assigned_grade: newTeacherGrade,
-      added_by: currentUser.email,
-      notes: 'تمت الإضافة من لوحة الخدمة',
-      status: 'active',
-    }).select('id, email, name, assigned_grade, status').single();
+    setIsAddingRoleAccount(true);
+    const { error } = await supabase.rpc('manage_app_role_email', {
+      p_email: email,
+      p_role: newAccountRole,
+      p_name: name,
+      p_grade: newAccountRole === 'teacher' ? newTeacherGrade : null,
+    });
 
     if (error) {
-      setFeedbackToast(error.code === '23505' ? 'هذا البريد مسجل بالفعل.' : 'تعذرت إضافة الخادم. تأكد من صلاحية أمين الخدمة.');
-    } else if (data) {
-      const nextApprovals = [data as TeacherApproval, ...teacherApprovals];
-      setTeacherApprovals(nextApprovals);
-      setApprovedTeachersCount(nextApprovals.filter((row) => row.status === 'active' && row.assigned_grade).length);
-      setFeedbackToast(`تم اعتماد ${email} للصف المحدد. ستتحدث صلاحيات الحساب الحالي تلقائياً من قاعدة البيانات.`);
-      setNewTeacherEmail('');
-      setNewTeacherName('');
-      setNewTeacherGrade('grade-2');
-      setIsQuickAddModalOpen(false);
+      console.error('Unable to manage role account:', error);
+      const message = error.code === '23505'
+        ? 'هذا البريد مسجل بالفعل تحت صلاحية أخرى.'
+        : error.message?.includes('already assigned')
+          ? 'هذا البريد مرتبط بالفعل بصلاحية أخرى. راجع قائمة الحسابات.'
+          : 'تعذرت إضافة الصلاحية. تأكد من صحة البريد وأن حسابك أمين خدمة عام.';
+      setFeedbackToast(message);
+      setIsAddingRoleAccount(false);
+      window.setTimeout(() => setFeedbackToast(''), 5000);
+      return;
     }
-    window.setTimeout(() => setFeedbackToast(''), 4000);
+
+    const { data: accountRows, error: accountsError } = await supabase.rpc('list_app_role_emails');
+    if (!accountsError && Array.isArray(accountRows)) setRoleAccounts(accountRows as ManagedRoleAccount[]);
+
+    if (newAccountRole === 'teacher') {
+      const { data: teacherRows, error: teacherRowsError } = await supabase
+        .from('teachers_whitelist')
+        .select('id, email, name, assigned_grade, status')
+        .order('created_at', { ascending: false });
+      if (!teacherRowsError && teacherRows) {
+        const rows = teacherRows as TeacherApproval[];
+        setTeacherApprovals(rows);
+        setApprovedTeachersCount(rows.filter((row) => row.status === 'active' && row.assigned_grade).length);
+      }
+    }
+
+    setFeedbackToast(
+      newAccountRole === 'teacher'
+        ? 'تم اعتماد ' + email + ' كخادم للصف المحدد.'
+        : newAccountRole === 'head'
+          ? 'تم اعتماد ' + email + ' كأمين خدمة عام.'
+          : 'تم اعتماد ' + email + ' كحساب TEST.'
+    );
+    setNewTeacherEmail('');
+    setNewTeacherName('');
+    setNewTeacherGrade('grade-2');
+    setNewAccountRole('teacher');
+    setIsQuickAddModalOpen(false);
+    setIsAddingRoleAccount(false);
+    window.setTimeout(() => setFeedbackToast(''), 4500);
   };
 
   const handleUpdateTeacherGrade = async (teacherId: string, grade: MiddleSchoolGrade) => {
@@ -524,7 +599,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
               >
                 +
               </div>
-              <span>إضافة خادم جديد (+)</span>
+              <span>إضافة حساب أو صلاحية (+)</span>
             </button>
           )}
 
@@ -679,6 +754,34 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
                   </div>
                 );
               })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {isHead && (
+        <section className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right liquid-glass-card backdrop-blur-3xl">
+          <div className="border-b pb-4" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+            <h2 className="text-lg font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>أمناء الخدمة وحسابات الاختبار</h2>
+            <p className="mt-1 text-xs text-[#77717A] dark:text-[#B8B1BB]">هذه القائمة تعرض الحسابات التي أضيفت عبر صلاحيات أمين الخدمة العام. إضافة البريد لا تكشف كلمة مروره ولا تنشئ كلمة مرور نيابةً عن صاحبه.</p>
+          </div>
+          {roleAccounts.filter((account) => account.role === 'head' || account.role === 'test').length === 0 ? (
+            <p className="rounded-2xl border p-4 text-xs text-[#77717A] dark:text-[#B8B1BB]" style={{ borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0' }}>
+              لا توجد حسابات إضافية من هذا النوع حتى الآن.
+            </p>
+          ) : (
+            <div className="divide-y" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+              {roleAccounts.filter((account) => account.role === 'head' || account.role === 'test').map((account) => (
+                <div key={account.role + ':' + account.email} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>{account.name || account.email}</p>
+                    <p className="mt-1 text-[11px] font-mono text-[#77717A] dark:text-[#B8B1BB]" dir="ltr">{account.email}</p>
+                  </div>
+                  <span className="self-start rounded-full border px-3 py-1.5 text-[11px] font-bold" style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.4)' : '#DFC0CA', color: account.role === 'test' ? (theme === 'dark' ? '#D6B878' : '#765A22') : (theme === 'dark' ? '#F3DEAB' : '#76243A') }}>
+                    {roleAccountLabels[account.role]}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </section>
@@ -923,23 +1026,39 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
               </button>
               <h3 className="text-base font-bold flex items-center gap-1.5" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
                 <Plus className="w-4 h-4 text-[#C5A15A]" />
-                <span>إضافة خادم جديد (+)</span>
+                <span>إضافة حساب أو صلاحية (+)</span>
               </h3>
             </div>
 
             <p className="text-xs text-[#77717A] dark:text-[#B8B1BB]">
-              أدخل إيميل المعلم. بمجرد أن يسجل حسابه سيدخل مباشرة بصفة (خادم فصلي).
+              اختر الصلاحية وأدخل البريد. يتم اعتماد الدور من قاعدة البيانات؛ لا يمكن للحساب أن يمنح نفسه صلاحيات.
             </p>
 
             <form onSubmit={handleQuickAddTeacher} className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-xs font-semibold block">إيميل الخادم:</label>
+                <label className="text-xs font-semibold block">نوع الحساب:</label>
+                <select
+                  required
+                  value={newAccountRole}
+                  onChange={(event) => setNewAccountRole(event.target.value as ManagedRoleAccount['role'])}
+                  disabled={isAddingRoleAccount}
+                  className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
+                  style={{ backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF', borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0', color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
+                >
+                  <option value="teacher">خادم / معلم لفصل</option>
+                  <option value="head">أمين خدمة عام إضافي</option>
+                  <option value="test">حساب اختبار TEST</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold block">البريد الإلكتروني للحساب:</label>
                 <input
                   type="email"
                   required
                   dir="ltr"
-                  placeholder="teacher@maseery.org"
+                  placeholder={newAccountRole === 'head' ? 'head@maseery.org' : newAccountRole === 'test' ? 'test@maseery.org' : 'teacher@maseery.org'}
                   value={newTeacherEmail}
+                  disabled={isAddingRoleAccount}
                   onChange={(e) => setNewTeacherEmail(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
                   style={{
@@ -956,6 +1075,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
                   type="text"
                   placeholder="مثال: أ/ فادي يوسف"
                   value={newTeacherName}
+                  disabled={isAddingRoleAccount}
                   onChange={(e) => setNewTeacherName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
                   style={{
@@ -966,28 +1086,33 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold block">الصف المسند إلى الخادم:</label>
-                <select
-                  required
-                  value={newTeacherGrade}
-                  onChange={(event) => setNewTeacherGrade(event.target.value as MiddleSchoolGrade)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
-                  style={{
-                    backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
-                    borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
-                    color: theme === 'dark' ? '#F5F1F0' : '#272329',
-                  }}
-                >
-                  <option value="grade-1">الصف السابع (أولى إعدادي)</option>
-                  <option value="grade-2">الصف الثامن (تانية إعدادي)</option>
-                  <option value="grade-3">الصف التاسع (تالتة إعدادي)</option>
-                </select>
-              </div>
+              {newAccountRole === 'teacher' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold block">الصف المسند إلى الخادم:</label>
+                  <select
+                    required
+                    value={newTeacherGrade}
+                    onChange={(event) => setNewTeacherGrade(event.target.value as MiddleSchoolGrade)}
+                    className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
+                    style={{
+                      backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
+                      borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
+                      color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                    }}
+                  >
+                    <option value="grade-1">الصف السابع (أولى إعدادي)</option>
+                    <option value="grade-2">الصف الثامن (تانية إعدادي)</option>
+                    <option value="grade-3">الصف التاسع (تالتة إعدادي)</option>
+                  </select>
+                </div>
+  
+  
+              )}
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-2xl text-xs font-bold shadow-lg church-btn-primary"
+                disabled={isAddingRoleAccount}
+                className="w-full py-3 rounded-2xl text-xs font-bold shadow-lg church-btn-primary disabled:opacity-60"
                 style={{
                   background:
                     theme === 'dark'
@@ -997,7 +1122,7 @@ export const ServantDashboardScreen: React.FC<ServantDashboardScreenProps> = ({
                   border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.45)' : 'none',
                 }}
               >
-                تأكيد واعتماد الإيميل (+)
+                {isAddingRoleAccount ? 'جارٍ حفظ الصلاحية...' : 'إضافة الصلاحية (+)'}
               </button>
             </form>
           </div>
