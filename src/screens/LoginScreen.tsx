@@ -70,7 +70,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       });
 
       if (error || !data.user) {
-        setErrorMsg('تعذر تسجيل الدخول. راجع البريد الإلكتروني وكلمة المرور، وتأكد من تأكيد بريدك الإلكتروني.');
+        const reason = (error?.message ?? '').toLowerCase();
+        if (reason.includes('email not confirmed')) {
+          setErrorMsg('هذا الحساب أُنشئ قبل تعطيل تأكيد البريد وما زال غير مؤكد. لا تنشئ حساباً آخر بنفس البريد؛ اطلب من أمين الخدمة مراجعة حالة الحساب.');
+        } else if (reason.includes('invalid login credentials')) {
+          setErrorMsg('البريد الإلكتروني أو كلمة المرور غير صحيحين. راجع البيانات، أو استخدم استعادة كلمة المرور إذا نسيت كلمة المرور.');
+        } else {
+          setErrorMsg(error?.message
+            ? `تعذر تسجيل الدخول: ${error.message}`
+            : 'تعذر تسجيل الدخول. تحقق من البريد الإلكتروني وكلمة المرور ثم حاول مرة أخرى.');
+        }
         return;
       }
 
