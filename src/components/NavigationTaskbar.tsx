@@ -73,6 +73,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
         { id: 'get-started', label: 'الرئيسية', icon: Compass },
         { id: 'dashboard', label: 'رحلتي', icon: LayoutDashboard },
         { id: 'profile', label: 'حسابي', icon: UserIcon },
+        ...(isHead ? [{ id: 'supabase' as const, label: 'البيانات', icon: Database }] : []),
         { id: 'logout', label: 'خروج', icon: LogOut, action: 'logout' },
       ]
     : [
@@ -223,7 +224,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
       {/* Fixed phone bottom navigation with safe-area inset for iOS / Android gesture areas */}
       <nav
         aria-label="التنقل السفلي"
-        className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 gap-1 border-t px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_28px_rgba(20,17,23,.10)] backdrop-blur-3xl md:hidden"
+        className={`fixed inset-x-0 bottom-0 z-50 grid ${currentUser?.role === 'head' ? 'grid-cols-5' : 'grid-cols-4'} gap-1 border-t px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_28px_rgba(20,17,23,.10)] backdrop-blur-3xl md:hidden`}
         style={{
           backgroundColor: theme === 'dark' ? 'rgba(24,20,27,.94)' : 'rgba(255,255,255,.94)',
           borderColor: theme === 'dark' ? 'rgba(214,184,120,.22)' : '#E7E2E0',
