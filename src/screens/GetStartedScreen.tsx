@@ -63,6 +63,19 @@ export const GetStartedScreen: React.FC<GetStartedScreenProps> = ({
           </div>
         </div>
 
+        {/* Family identity: this app is part of Osret El Rosol */}
+        <div
+          className="relative z-10 mb-5 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm"
+          style={{
+            backgroundColor: theme === 'dark' ? 'rgba(32,28,38,.8)' : 'rgba(255,255,255,.82)',
+            borderColor: theme === 'dark' ? 'rgba(214,184,120,.42)' : 'rgba(118,36,58,.18)',
+            color: theme === 'dark' ? '#F3DEAB' : '#76243A',
+          }}
+        >
+          <img src="/logo-family.jpg?v=20261011-1" alt="شعار أسرة الرسل" className="h-8 w-8 rounded-full object-cover" />
+          <span className="text-xs font-black">أسرة الرسل</span>
+        </div>
+
         {/* Title & Spiritual Calling */}
         <div className="max-w-3xl space-y-3">
           <div className="flex items-center justify-center gap-2">
@@ -74,7 +87,7 @@ export const GetStartedScreen: React.FC<GetStartedScreenProps> = ({
                 border: `1px solid ${theme === 'dark' ? 'rgba(214, 184, 120, 0.45)' : '#DFC0CA'}`,
               }}
             >
-              كنيستنا القبطية الأرثوذكسية · خدمة المرحلة الإعدادية
+              أسرة الرسل · خدمة إعدادي
             </span>
           </div>
 
@@ -89,14 +102,14 @@ export const GetStartedScreen: React.FC<GetStartedScreenProps> = ({
             className="text-xl sm:text-2xl font-black"
             style={{ color: theme === 'dark' ? '#F3DEAB' : '#8C2B45' }}
           >
-            رحلتك اليومية للنمو والشهادة للمسيح
+            كل يوم خطوة صغيرة تقرّبك من ربنا
           </p>
 
           <p
             className="text-sm sm:text-base max-w-2xl mx-auto leading-relaxed font-medium pt-1"
             style={{ color: theme === 'dark' ? '#B8B1BB' : '#6B6670' }}
           >
-            منصة تلمذة روحية تفاعلية ترافق شباب وبنات إعدادي وخدامهم؛ لتوثيق الصلاة اليومية، حفظ آيات وترانيم الكنيسة، وتعميق المحبة والتواصل في جسد المسيح الحي.
+            هنا شباب وبنات إعدادي وخدامهم بيكبروا في الإيمان مع بعض: صلاة، إنجيل، ترانيم، محبة، وخطوات صغيرة تقرّبنا من ربنا.
           </p>
         </div>
 
@@ -161,7 +174,7 @@ export const GetStartedScreen: React.FC<GetStartedScreenProps> = ({
                 }}
               >
                 <Sparkles className="w-5 h-5 text-[#D6B878]" />
-                <span>ابدأ رحلتك (إنشاء حساب)</span>
+                <span>يلا نبدأ (اعمل حساب)</span>
                 <ChevronLeft className="w-5 h-5" />
               </button>
 
@@ -175,7 +188,7 @@ export const GetStartedScreen: React.FC<GetStartedScreenProps> = ({
                   color: theme === 'dark' ? '#F3DEAB' : '#76243A',
                 }}
               >
-                تسجيل الدخول
+                أنا عندي حساب
               </button>
             </>
           )}
