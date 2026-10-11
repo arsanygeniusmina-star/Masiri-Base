@@ -10,9 +10,9 @@ interface TestRoleSwitcherProps {
 
 const options: { role: UserRole | null; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { role: null, label: 'TEST / التشخيص', icon: Code2 },
-  { role: 'student', label: 'معاينة الطالب', icon: GraduationCap },
-  { role: 'teacher', label: 'معاينة الخادم', icon: Sparkles },
-  { role: 'head', label: 'معاينة أمين الخدمة', icon: ShieldCheck },
+  { role: 'student', label: 'تجربة الطالب', icon: GraduationCap },
+  { role: 'teacher', label: 'تجربة الخادم', icon: Sparkles },
+  { role: 'head', label: 'تجربة أمين الخدمة', icon: ShieldCheck },
 ];
 
 export const TestRoleSwitcher: React.FC<TestRoleSwitcherProps> = ({ activeRole, onSelect, theme }) => {
@@ -31,11 +31,11 @@ export const TestRoleSwitcher: React.FC<TestRoleSwitcherProps> = ({ activeRole, 
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Code2 className="h-4 w-4 shrink-0" style={{ color: selected }} />
-            <p className="text-xs font-black" style={{ color: primary }}>وضع الاختبار الداخلي</p>
+            <p className="text-xs font-black" style={{ color: primary }}>وضع التجربة</p>
             <span className="rounded-full border px-2 py-0.5 text-[10px] font-black" style={{ borderColor: border, color: selected }}>TEST</span>
           </div>
           <p className="mt-1 text-[11px] leading-5" style={{ color: dark ? '#B8B1BB' : '#77717A' }}>
-            اختر دوراً لتجربة الواجهة تفاعلياً. التغييرات داخل وضع المحاكاة محلية فقط ولا تُكتب إلى قاعدة البيانات أو حسابات حقيقية.
+            جرّب شكل التطبيق كطالب أو خادم أو أمين خدمة. أي تعديل هنا تجريبي ومحلي، ومش هيغيّر أي حساب أو بيانات حقيقية.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

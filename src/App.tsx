@@ -361,7 +361,7 @@ export default function App() {
               previewRole ? (
                 <div className="relative">
                   <div className="relative z-20 mx-4 mt-4 rounded-2xl border p-3 text-center text-xs font-bold shadow-lg" role="status" style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.45)' : '#DFC0CA', background: theme === 'dark' ? 'rgba(32,24,34,.95)' : 'rgba(255,255,255,.96)', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
-                    وضع محاكاة تفاعلي — يمكنك تجربة الأزرار والعمليات. التغييرات تجريبية ومحلية ولا تعدّل حسابات أو بيانات حقيقية.
+                    وضع تجربة تفاعلي — جرّب الأزرار براحتك. أي تغييرات هنا تجريبية ومش بتأثر على أي حساب أو بيانات حقيقية.
                   </div>
                   {renderDashboard()}
                 </div>
@@ -382,10 +382,10 @@ export default function App() {
       >
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-right">
           <div className="flex items-center gap-2">
-            <img src="/logo-family.jpg?v=20261010-1" alt="شعار مَسِيري" className="h-5 w-5 rounded-md border object-cover" />
-            <span className="font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>مَسِيري</span>
+            <img src="/logo-family.jpg?v=20261010-1" alt="شعار أسرة الرسل" className="h-7 w-7 rounded-full border object-cover" />
+            <span className="font-semibold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>أسرة الرسل</span>
             <span>·</span>
-            <span>منصة خدمة المرحلة الإعدادية الكنسية</span>
+            <span>مَسِيري — مشوارنا في خدمة إعدادي</span>
           </div>
           <span className="text-[11px]">«لاَ يَمْنَعْكَ صِبَاكَ مِنْ أَنْ تَكُونَ قُدْوَةً لِلْمُؤْمِنِينَ» (١ تيموثاوس ٤: ١٢)</span>
           <img
