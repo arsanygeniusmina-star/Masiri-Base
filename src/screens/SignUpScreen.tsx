@@ -21,10 +21,10 @@ import { BrandSpinner, FormLoadingOverlay } from '../components/BrandLoadingSkel
 type SignupRole = 'student' | 'teacher' | 'head' | 'test';
 
 const signupRoleLabels: Record<SignupRole, string> = {
-  student: 'طالب',
+  student: 'طالب إعدادي',
   teacher: 'خادم / معلم',
-  head: 'أمين الخدمة العام',
-  test: 'حساب اختبار',
+  head: 'أمين الخدمة',
+  test: 'حساب تجريبي',
 };
 
 interface SignUpScreenProps {
@@ -97,7 +97,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     setSubmitFeedback(null);
 
     if (!name.trim()) {
-      const message = 'يرجى إدخال الاسم كاملاً.';
+      const message = 'اكتب اسمك بالكامل الأول.';
       setErrorMsg(message);
       setSubmitFeedback({ tone: 'error', text: message });
       return;
@@ -109,20 +109,20 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
       return;
     }
     if (password.length < 8) {
-      const message = 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.';
+      const message = 'كلمة السر لازم تكون 8 حروف على الأقل.';
       setErrorMsg(message);
       setSubmitFeedback({ tone: 'error', text: message });
       return;
     }
 
     setIsLoading(true);
-    setSubmitFeedback({ tone: 'info', text: 'جارٍ التحقق من نوع الحساب ثم إنشاء الحساب...' });
+    setSubmitFeedback({ tone: 'info', text: 'تمام، بنراجع نوع الحساب وبنجهّز حسابك...' });
     try {
       // Re-check on submit so a stale UI hint can never choose signup metadata.
       const { data: roleData, error: roleError } = await supabase.rpc('detect_signup_role', { p_email: cleanEmail });
       if (roleError) throw new Error('تعذر تحديد نوع الحساب من قاعدة البيانات. تحقق من الاتصال ثم أعد المحاولة.');
       if (!['student', 'teacher', 'head', 'test'].includes(String(roleData))) {
-        throw new Error('تعذر تحديد نوع الحساب لهذا البريد الإلكتروني.');
+        throw new Error('تعذر تحديد نوع الحساب لهذا الإيميل.');
       }
       const signupRole = roleData as SignupRole;
       setDetectedRole(signupRole);
@@ -151,9 +151,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           normalizedReason.includes('user already registered') ||
           normalizedReason.includes('already been registered');
         const message = isAlreadyRegistered
-          ? 'هذا البريد الإلكتروني مسجل بالفعل. استخدم زر تسجيل الدخول أسفل النموذج أو استعادة كلمة المرور بدلاً من إنشاء حساب ثانٍ.'
+          ? 'الإيميل ده مسجل بالفعل. ادخل على حسابك أو استرجع كلمة السر بدل ما تعمل حساب تاني.'
           : isEmailRateLimit
-            ? 'رفض خادم Supabase طلب التسجيل بسبب حد إرسال البريد (429). إعداد المشروع يسمح الآن بالتسجيل دون تأكيد البريد؛ لا تكرر الطلب بسرعة. إذا كان هذا البريد مسجلاً بالفعل، انتقل إلى تسجيل الدخول.'
+            ? 'Supabase رفض التسجيل بسبب كثرة محاولات إرسال رسائل التأكيد (429). إعداد التأكيد لازم يتغيّر من لوحة Supabase قبل ما التسجيل يشتغل. لو الإيميل ده مسجل بالفعل، جرّب تدخل بدل ما تسجل تاني.'
             : reason
               ? `تعذر إنشاء الحساب: ${reason}`
               : 'لم يُرجع نظام الدخول حساباً جديداً. تحقق من البيانات وحاول مرة أخرى.';
@@ -165,20 +165,20 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
 
       // Supabase can return an empty identities list for a duplicate email.
       if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-        const message = 'هذا البريد الإلكتروني مسجل بالفعل. انتقل إلى تسجيل الدخول أو استعادة كلمة المرور؛ لن ننشئ حساباً مكرراً.';
+        const message = 'الإيميل ده مسجل بالفعل. ادخل على حسابك أو استرجع كلمة السر؛ مش هنعمل حساب مكرر.';
         setErrorMsg(message);
         setSubmitFeedback({ tone: 'error', text: message });
         return;
       }
 
       if (!data.session) {
-        const message = 'لم يُرجع خادم الحسابات جلسة دخول بعد التسجيل. لا تعِد المحاولة بالبريد نفسه فوراً؛ جرّب تسجيل الدخول، وإذا استمر الخطأ أرسل هذه الرسالة إلى أمين الخدمة.';
+        const message = 'لم يُرجع خادم الحسابات جلسة دخول بعد التسجيل. لا تعِد المحاولة بالبريد نفسه فوراً؛ جرّب ادخل على حسابك، وإذا استمر الخطأ أرسل هذه الرسالة إلى أمين الخدمة.';
         setErrorMsg(message);
         setSubmitFeedback({ tone: 'error', text: message });
         return;
       }
 
-      setSubmitFeedback({ tone: 'info', text: 'تم تسجيل الدخول بنجاح. جارٍ تحميل الملف الشخصي...' });
+      setSubmitFeedback({ tone: 'info', text: 'تم ادخل على حسابك بنجاح. جارٍ تحميل الملف الشخصي...' });
       const profile = await fetchUserProfile(data.user.id);
       if (!profile) {
         await supabase.auth.signOut();
@@ -188,7 +188,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
         return;
       }
 
-      setSubmitFeedback({ tone: 'success', text: 'تم إنشاء الحساب بنجاح. جارٍ فتح الملف الشخصي...' });
+      setSubmitFeedback({ tone: 'success', text: 'تمام! حسابك اتعمل، بنفتحلك الملف الشخصي...' });
       onSignUpSuccess(profile);
     } catch (error) {
       console.error('Masiri sign-up failed:', error);
@@ -238,14 +238,18 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             className="text-2xl sm:text-3xl font-extrabold tracking-tight"
             style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
           >
-            إنشاء حساب جديد في مَسِيري
+            يلا نعمل حساب في مَسِيري
           </h1>
           <p
             className="text-sm sm:text-base font-medium leading-relaxed"
             style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}
           >
-            منصة المرحلة الإعدادية الكنسية للنمو الروحي والخدمة
+            حسابك في أسرة الرسل — خطوة بخطوة وببساطة.
           </p>
+          <div className="mx-auto mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5" style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.38)' : 'rgba(118,36,58,.18)', backgroundColor: theme === 'dark' ? 'rgba(32,28,38,.72)' : 'rgba(255,255,255,.78)', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
+            <img src="/logo-family.jpg?v=20261011-1" alt="شعار أسرة الرسل" className="h-7 w-7 rounded-full object-cover" />
+            <span className="text-xs font-black">أسرة الرسل</span>
+          </div>
         </div>
 
         <div
@@ -258,10 +262,10 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
         >
           <div className="flex items-center gap-2 font-bold">
             <ShieldCheck className="h-4 w-4 shrink-0" />
-            <span>تحديد الصلاحيات يتم بأمان من قاعدة البيانات</span>
+            <span>نوع حسابك بيتحدد تلقائي وبأمان</span>
           </div>
           <p className="mt-1 leading-relaxed opacity-90">
-            يتم اعتماد دور الطالب أو الخادم من سجلات الخدمة، ولا يمكن اختيار صلاحيات أمين الخدمة من نموذج التسجيل.
+            الدور بيتحدد من سجلات الخدمة، ومش ممكن تختار لنفسك صلاحيات أمين الخدمة من هنا.
           </p>
         </div>
 
@@ -295,7 +299,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               className="block text-xs font-bold"
               style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
             >
-              الاسم بالكامل
+              اسمك بالكامل
             </label>
             <div className="relative">
               <input
@@ -322,7 +326,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               className="block text-xs font-bold"
               style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
             >
-              البريد الإلكتروني
+              الإيميل
             </label>
             <div className="relative">
               <input
@@ -352,17 +356,17 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               }}
             >
               {isDetectingRole ? (
-                <span>جارٍ التعرّف على نوع الحساب من قاعدة البيانات...</span>
+                <span>ثواني وبنتعرّف على نوع حسابك...</span>
               ) : detectedRole ? (
-                <span>نوع الحساب المكتشف: <strong>{signupRoleLabels[detectedRole]}</strong>. الصلاحية النهائية تُعتمد من قاعدة البيانات.</span>
+                <span>الإيميل ده متسجل كـ <strong>{signupRoleLabels[detectedRole]}</strong>. الصلاحيات بتتراجع بأمان من قاعدة البيانات.</span>
               ) : roleDetectionError ? (
                 <span>{roleDetectionError}</span>
               ) : (
-                <span>اكتب بريدًا إلكترونيًا كاملًا للتعرّف على نوع الحساب تلقائيًا.</span>
+                <span>اكتب الإيميل كامل، وإحنا هنعرف نوع الحساب تلقائي.</span>
               )}
             </div>
             <p className="pt-2 text-sm leading-relaxed text-[#77717A] dark:text-[#B8B1BB]">
-              يتم التعرف على نوع الحساب تلقائياً من سجلات الكنيسة. إذا كان البريد معتمداً كخادم أو أمين خدمة أو حساب اختبار، ستظهر الصلاحية المسجلة فقط.
+              نوع الحساب بيتحدد من سجلات الخدمة. لو الإيميل مسجل كخادم أو أمين خدمة أو حساب تجريبي، هتظهر الصلاحية المناسبة تلقائي.
             </p>
           </div>
 
@@ -373,7 +377,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               className="block text-xs font-bold"
               style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
             >
-              كلمة المرور
+              كلمة السر
             </label>
             <div className="relative">
               <input
@@ -395,8 +399,8 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 type="button"
                 disabled={isLoading}
                 onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                aria-label={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
+                title={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
                 className="absolute left-1 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#77717A] hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] dark:text-[#B8B1BB] dark:hover:bg-white/5"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -411,7 +415,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               className="block text-xs font-bold"
               style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
             >
-              رقم الهاتف أو الواتساب
+              رقم موبايلك أو واتساب
             </label>
             <div className="relative">
               <input
@@ -439,19 +443,19 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-[#76243A] dark:text-[#B65370]">
-                  المرحلة الإعدادية
+                  اختار صفك
                 </span>
                 <label className="block text-xs font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                  الصف الدراسي:
+                  صفك:
                 </label>
               </div>
 
               {/* 7th, 8th, and 9th Grade Super Liquid Glass Tiles */}
               <div className="grid grid-cols-3 gap-2.5">
                 {[
-                  { id: 'grade-1' as const, label: 'الصف السابع', sub: 'أولى إعدادي / 7th' },
-                  { id: 'grade-2' as const, label: 'الصف الثامن', sub: 'تانية إعدادي / 8th' },
-                  { id: 'grade-3' as const, label: 'الصف التاسع', sub: 'تالتة إعدادي / 9th' },
+                  { id: 'grade-1' as const, label: 'أولى إعدادي (7)', sub: 'أولى إعدادي / 7th' },
+                  { id: 'grade-2' as const, label: 'تانية إعدادي (8)', sub: 'تانية إعدادي / 8th' },
+                  { id: 'grade-3' as const, label: 'تالتة إعدادي (9)', sub: 'تالتة إعدادي / 9th' },
                 ].map((g) => {
                   const isSelected = gradeLevel === g.id;
                   return (
@@ -542,7 +546,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               </div>
             ) : (
               <>
-                <span>إنشاء حساب جديد</span>
+                <span>اعمل حساب جديد</span>
                 <ChevronLeft className="w-4 h-4" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
               </>
             )}
@@ -582,7 +586,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                   className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-bold underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
                   style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.4)' : '#DFC0CA', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}
                 >
-                  تسجيل الدخول لهذا البريد
+                  ادخل على حسابك لهذا البريد
                 </button>
               )}
             </div>
@@ -595,13 +599,13 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
         >
           <p style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
-            لديك حساب مسجل بالفعل؟{' '}
+            عندك حساب بالفعل؟{' '}
             <button
               type="button"
               onClick={() => onNavigate('login')}
               className="inline-flex min-h-10 items-center rounded-lg px-2 font-bold underline underline-offset-2 hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] text-[#76243A] dark:text-[#B65370]"
             >
-              تسجيل الدخول
+              ادخل على حسابك
             </button>
           </p>
 
@@ -610,7 +614,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             onClick={() => onNavigate('get-started')}
             className="text-[11px] text-[#77717A] dark:text-[#B8B1BB] hover:underline block mx-auto pt-1"
           >
-            ← العودة لشاشة البداية والترحيب
+            ← ارجع للبداية
           </button>
         </div>
       </div>
