@@ -68,7 +68,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
     if (!password) {
-      setErrorMsg('يرجى كتابة كلمة المرور.');
+      setErrorMsg('يرجى كتابة كلمة السر.');
       return;
     }
 
@@ -85,11 +85,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         if (reason.includes('email not confirmed')) {
           setErrorMsg('هذا الحساب أُنشئ قبل تعطيل تأكيد البريد وما زال غير مؤكد. لا تنشئ حساباً آخر بنفس البريد؛ اطلب من أمين الخدمة مراجعة حالة الحساب.');
         } else if (reason.includes('invalid login credentials')) {
-          setErrorMsg('البريد الإلكتروني أو كلمة المرور غير صحيحين. راجع البيانات، أو استخدم استعادة كلمة المرور إذا نسيت كلمة المرور.');
+          setErrorMsg('الإيميل أو كلمة السر غير صحيحين. راجع البيانات، أو استخدم استعادة كلمة السر إذا نسيت كلمة السر.');
         } else {
           setErrorMsg(error?.message
             ? `تعذر تسجيل الدخول: ${error.message}`
-            : 'تعذر تسجيل الدخول. تحقق من البريد الإلكتروني وكلمة المرور ثم حاول مرة أخرى.');
+            : 'تعذر تسجيل الدخول. تحقق من الإيميل وكلمة السر ثم حاول مرة أخرى.');
         }
         return;
       }
@@ -161,14 +161,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             className="text-2xl sm:text-3xl font-extrabold tracking-tight"
             style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
           >
-            تسجيل الدخول إلى مَسِيري
+            أهلاً بيك تاني في مَسِيري
           </h1>
           <p
             className="text-sm sm:text-base font-medium leading-relaxed"
             style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}
           >
-            منصة خدمة المرحلة الإعدادية الكنسية
+            أسرة الرسل — نكمل المشوار سوا.
           </p>
+          <div className="mx-auto mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5" style={{ borderColor: theme === 'dark' ? 'rgba(214,184,120,.38)' : 'rgba(118,36,58,.18)', backgroundColor: theme === 'dark' ? 'rgba(32,28,38,.72)' : 'rgba(255,255,255,.78)', color: theme === 'dark' ? '#F3DEAB' : '#76243A' }}>
+            <img src="/logo-family.jpg?v=20261011-1" alt="شعار أسرة الرسل" className="h-7 w-7 rounded-full object-cover" />
+            <span className="text-xs font-black">أسرة الرسل</span>
+          </div>
         </div>
 
         {successMsg && <div role="status" className="rounded-2xl border p-3.5 text-xs leading-relaxed" style={{ backgroundColor: theme === 'dark' ? 'rgba(32,53,42,.8)' : '#E9F4EC', color: theme === 'dark' ? '#75C695' : '#347653', borderColor: theme === 'dark' ? '#3A3540' : '#B8D7C1' }}>{successMsg}</div>}
@@ -199,7 +203,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               className="block text-xs font-bold"
               style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
             >
-              البريد الإلكتروني
+              الإيميل
             </label>
             <div className="relative">
               <input
@@ -228,13 +232,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 className="block text-xs font-bold"
                 style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
               >
-                كلمة المرور
+                كلمة السر
               </label>
               <span
                 className="text-[11px] font-semibold"
                 style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}
               >
-                أدخل كلمة المرور المستخدمة عند التسجيل.
+                أدخل كلمة السر المستخدمة عند التسجيل.
               </span>
             </div>
             <div className="relative">
@@ -257,8 +261,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={isLoading}
-                aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                aria-label={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
+                title={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
                 className="absolute left-1 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#77717A] hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] dark:text-[#B8B1BB] dark:hover:bg-white/5"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -277,7 +281,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               setErrorMsg('');
               setSuccessMsg('');
               if (!cleanEmail || !cleanEmail.includes('@')) {
-                setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة المرور.');
+                setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة السر.');
                 return;
               }
               setIsLoading(true);
@@ -287,9 +291,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 });
                 if (error) {
                   console.error('Masiri password recovery failed:', error);
-                  setErrorMsg('تعذر إرسال رابط الاستعادة. تحقق من إعدادات البريد الإلكتروني وحاول لاحقاً.');
+                  setErrorMsg('تعذر إرسال رابط الاستعادة. تحقق من إعدادات الإيميل وحاول لاحقاً.');
                 } else {
-                  setSuccessMsg('إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور.');
+                  setSuccessMsg('إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة السر.');
                 }
               } catch (error) {
                 console.error('Masiri password recovery request failed:', error);
@@ -301,7 +305,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             className="inline-flex min-h-10 w-full items-center justify-center rounded-xl px-3 text-sm font-bold underline underline-offset-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
             style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}
           >
-            نسيت كلمة المرور؟ إرسال رابط استعادة
+            نسيت كلمة السر؟ ابعتلي رابط استعادة
           </button>
 
           {/* Submit button with Church Burgundy & Gold in Dark Mode */}
@@ -332,7 +336,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
             ) : (
               <>
-                <span>تسجيل الدخول</span>
+                <span>يلا ندخل</span>
                 <ArrowRight className="w-4 h-4" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
               </>
             )}
@@ -351,7 +355,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
         >
           <p style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
-            ليس لديك حساب بعد في مسيري؟{' '}
+            لسه معندكش حساب في مَسِيري؟{' '}
             <button
               onClick={() => onNavigate('signup')}
               className="font-bold underline hover:opacity-85 text-[#76243A] dark:text-[#B65370]"
@@ -364,7 +368,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             onClick={() => onNavigate('get-started')}
             className="text-[11px] text-[#77717A] dark:text-[#B8B1BB] hover:underline block mx-auto pt-1"
           >
-            ← العودة لشاشة البداية والترحيب
+            ← ارجع للبداية
           </button>
         </div>
       </div>
