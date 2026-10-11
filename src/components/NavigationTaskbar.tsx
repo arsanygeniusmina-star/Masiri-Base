@@ -60,11 +60,11 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
 
   const desktopItems: NavigationItem[] = [
     { id: 'get-started', label: 'الرئيسية', icon: Compass },
-    ...(currentUser ? [{ id: 'dashboard' as const, label: 'لوحة الرحلة', icon: LayoutDashboard }] : []),
+    ...(currentUser ? [{ id: 'dashboard' as const, label: 'مشواري', icon: LayoutDashboard }] : []),
     ...(!currentUser
       ? [
-          { id: 'login' as const, label: 'تسجيل الدخول', icon: LogIn },
-          { id: 'signup' as const, label: 'إنشاء حساب', icon: UserPlus },
+          { id: 'login' as const, label: 'دخول', icon: LogIn },
+          { id: 'signup' as const, label: 'حساب جديد', icon: UserPlus },
         ]
       : [{ id: 'profile' as const, label: 'حسابي', icon: UserIcon }]),
     ...(isHead && !simulationMode ? [{ id: 'supabase' as const, label: 'قاعدة البيانات', icon: Database }] : []),
@@ -76,7 +76,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
   const mobileItems: NavigationItem[] = currentUser
     ? [
         { id: 'get-started', label: 'الرئيسية', icon: Compass },
-        { id: 'dashboard', label: 'رحلتي', icon: LayoutDashboard },
+        { id: 'dashboard', label: 'مشواري', icon: LayoutDashboard },
         { id: 'profile', label: 'حسابي', icon: UserIcon },
         ...(isHead && !simulationMode ? [{ id: 'supabase' as const, label: 'البيانات', icon: Database }] : []),
         ...(isTest ? [{ id: 'test' as const, label: 'اختبار', icon: Database }] : []),
@@ -135,11 +135,11 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
           boxShadow: theme === 'dark' ? '0 0 14px rgba(214,184,120,.14)' : '0 3px 12px rgba(118,36,58,.12)',
         }}
       >
-        <img src="/logo-family.jpg?v=20261010-1" alt="" className="h-full w-full object-cover" />
+        <img src="/logo-family.jpg?v=20261010-1" alt="شعار أسرة الرسل" className="h-full w-full object-cover" />
       </span>
       <span className="flex min-w-0 flex-col leading-tight">
         <span className="whitespace-nowrap text-lg font-black tracking-tight" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>مَسِيري</span>
-        <span className="text-[10px] font-semibold" style={{ color: theme === 'dark' ? '#D6B878' : '#77717A' }}>رحلتك للنمو الروحي</span>
+        <span className="text-[10px] font-semibold" style={{ color: theme === 'dark' ? '#D6B878' : '#77717A' }}>أسرة الرسل · مشوارك مع ربنا</span>
       </span>
     </button>
   );
