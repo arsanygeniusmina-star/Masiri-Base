@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, MiddleSchoolGrade, TeacherWhitelistEntry } from '../types';
+import { User, MiddleSchoolGrade, TeacherWhitelistEntry, ManagedRoleAccount } from '../types';
 import { supabase, mapUserProfile } from '../lib/supabase';
 import {
   User as UserIcon,
@@ -103,10 +103,12 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
 
   // Head Teacher Whitelist Management State
   const [teachersList, setTeachersList] = useState<TeacherWhitelistEntry[]>([]);
+  const [roleAccounts, setRoleAccounts] = useState<ManagedRoleAccount[]>([]);
   const [newTeacherEmail, setNewTeacherEmail] = useState('');
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherGrade, setNewTeacherGrade] = useState<MiddleSchoolGrade>('grade-2');
   const [newTeacherNotes, setNewTeacherNotes] = useState('');
+  const [newAccountRole, setNewAccountRole] = useState<ManagedRoleAccount['role']>('teacher');
   const [whitelistFeedback, setWhitelistFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Quick Plus Button Modal for Head
@@ -149,22 +151,34 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
           status: 'active',
         },
       ]);
+      setRoleAccounts([
+        { email: 'head.preview@example.test', name: 'أمين خدمة تجريبي', role: 'head', assigned_grade: null, status: 'active', created_at: new Date().toISOString() },
+        { email: 'test.preview@example.test', name: 'حساب اختبار تجريبي', role: 'test', assigned_grade: null, status: 'active', created_at: new Date().toISOString() },
+      ]);
       return () => { cancelled = true; };
     }
 
-    const loadTeachers = async () => {
-      const { data, error } = await supabase
-        .from('teachers_whitelist')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const loadAll = async () => {
+      const [teachersResult, rolesResult] = await Promise.all([
+        supabase
+          .from('teachers_whitelist')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase.rpc('list_app_role_emails'),
+      ]);
 
       if (cancelled) return;
-      if (error) {
+
+      if (teachersResult.error) {
         setWhitelistFeedback({ type: 'error', message: 'تعذر تحميل قائمة الخدام من قاعدة البيانات.' });
         return;
       }
+      if (rolesResult.error) {
+        console.error('Unable to load role accounts:', rolesResult.error);
+        // Don't show error to user for this, just log it
+      }
 
-      setTeachersList((data || []).map((row: any) => ({
+      setTeachersList((teachersResult.data || []).map((row: any) => ({
         id: row.id,
         email: row.email,
         name: row.name,
@@ -174,9 +188,11 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
         notes: row.notes || undefined,
         status: row.status === 'active' ? 'active' : 'invited',
       })));
+
+      setRoleAccounts((rolesResult.data || []) as ManagedRoleAccount[]);
     };
 
-    void loadTeachers();
+    void loadAll();
     return () => { cancelled = true; };
   }, [isHead, currentUser.id, simulationMode]);
 
@@ -306,91 +322,168 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
       return;
     }
 
-    const cleanTeacherEmail = newTeacherEmail.trim().toLowerCase();
-    if (!cleanTeacherEmail.includes('@')) {
+    const cleanEmail = newTeacherEmail.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) {
       setWhitelistFeedback({ type: 'error', message: 'يرجى إدخال بريد إلكتروني صالح.' });
       return;
     }
 
+    // For teacher role, grade is required
+    if (newAccountRole === 'teacher' && !newTeacherGrade) {
+      setWhitelistFeedback({ type: 'error', message: 'يجب تحديد الصف للخادم.' });
+      return;
+    }
+
     if (simulationMode) {
-      if (teachersList.some((teacher) => teacher.email.toLowerCase() === cleanTeacherEmail)) {
+      // Check if email already exists in either list
+      const exists = teachersList.some((t) => t.email.toLowerCase() === cleanEmail) ||
+                     roleAccounts.some((r) => r.email.toLowerCase() === cleanEmail);
+      if (exists) {
         setWhitelistFeedback({ type: 'error', message: 'هذا البريد موجود بالفعل في بيانات المحاكاة.' });
         return;
       }
-      const previewEntry: TeacherWhitelistEntry = {
-        id: 'preview-profile-teacher-' + Date.now(),
-        email: cleanTeacherEmail,
-        name: newTeacherName.trim() || 'خادم جديد',
-        assignedGrade: newTeacherGrade,
-        addedBy: currentUser.email,
-        addedAt: new Date().toISOString(),
-        notes: newTeacherNotes.trim() || 'تمت الإضافة في وضع المحاكاة',
-        status: 'active',
-      };
-      setTeachersList((previous) => [previewEntry, ...previous]);
+
+      const name = newTeacherName.trim() || (newAccountRole === 'teacher' ? 'خادم جديد' : newAccountRole === 'head' ? 'أمين خدمة جديد' : 'حساب اختبار');
+
+      if (newAccountRole === 'teacher') {
+        const previewEntry: TeacherWhitelistEntry = {
+          id: 'preview-profile-teacher-' + Date.now(),
+          email: cleanEmail,
+          name,
+          assignedGrade: newTeacherGrade,
+          addedBy: currentUser.email,
+          addedAt: new Date().toISOString(),
+          notes: newTeacherNotes.trim() || 'تمت الإضافة في وضع المحاكاة',
+          status: 'active',
+        };
+        setTeachersList((previous) => [previewEntry, ...previous]);
+      } else {
+        const role = newAccountRole as ManagedRoleAccount['role'];
+        const previewRoleAccount: ManagedRoleAccount = {
+          email: cleanEmail,
+          name,
+          role,
+          assigned_grade: role === 'teacher' ? newTeacherGrade : null,
+          status: 'active',
+          created_at: new Date().toISOString(),
+        };
+        setRoleAccounts((previous) => [previewRoleAccount, ...previous]);
+      }
+
       setNewTeacherEmail('');
       setNewTeacherName('');
       setNewTeacherNotes('');
-      setWhitelistFeedback({ type: 'success', message: 'تمت إضافة الخادم في وضع المحاكاة فقط؛ لم تتغير قاعدة البيانات.' });
+      setNewTeacherGrade('grade-2');
+      setNewAccountRole('teacher');
+      setWhitelistFeedback({ type: 'success', message: 'تمت الإضافة في وضع المحاكاة فقط؛ لم تتغير قاعدة البيانات.' });
       setIsQuickAddModalOpen(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('teachers_whitelist')
-      .insert({
-        email: cleanTeacherEmail,
-        name: newTeacherName.trim() || 'خادم جديد',
-        assigned_grade: newTeacherGrade,
-        added_by: currentUser.email,
-        notes: newTeacherNotes.trim() || null,
-        status: 'active',
-      })
-      .select('*')
-      .single();
+    // Use the RPC that handles teacher, head, and test roles
+    const { data, error } = await supabase.rpc('manage_app_role_email', {
+      p_email: cleanEmail,
+      p_role: newAccountRole,
+      p_name: newTeacherName.trim() || null,
+      p_grade: newAccountRole === 'teacher' ? newTeacherGrade : null,
+    });
 
     if (error) {
-      setWhitelistFeedback({
-        type: 'error',
-        message: error.code === '23505' ? 'هذا البريد مسجل بالفعل في قائمة الخدام.' : 'تعذرت إضافة الخادم. تأكد أن حسابك لديه صلاحية أمين الخدمة.',
-      });
+      const msg = error.code === '23505' || error.message.includes('already assigned')
+        ? 'هذا البريد مسجل بالفعل تحت صلاحية أخرى.'
+        : error.message?.includes('Only an authenticated Head')
+          ? 'صلاحية أمين الخدمة مطلوبة.'
+          : error.message?.includes('valid email')
+            ? 'بريد إلكتروني غير صالح.'
+            : error.message?.includes('grade')
+              ? 'يجب تحديد الصف للمعلمين.'
+              : 'تعذرت الإضافة. تأكد من صلاحية أمين الخدمة.';
+      setWhitelistFeedback({ type: 'error', message: msg });
       return;
     }
 
-    const newEntry: TeacherWhitelistEntry = {
-      id: data.id,
-      email: data.email,
-      name: data.name,
-      assignedGrade: data.assigned_grade || undefined,
-      addedBy: data.added_by,
-      addedAt: data.created_at,
-      notes: data.notes || undefined,
-      status: data.status === 'active' ? 'active' : 'invited',
-    };
-    setTeachersList((previous) => [newEntry, ...previous]);
+    // Refresh both lists
+    const [teachersResult, rolesResult] = await Promise.all([
+      supabase.from('teachers_whitelist').select('*').order('created_at', { ascending: false }),
+      supabase.rpc('list_app_role_emails'),
+    ]);
+
+    if (!teachersResult.error) {
+      setTeachersList((teachersResult.data || []).map((row: any) => ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        assignedGrade: row.assigned_grade || undefined,
+        addedBy: row.added_by,
+        addedAt: row.created_at,
+        notes: row.notes || undefined,
+        status: row.status === 'active' ? 'active' : 'invited',
+      })));
+    }
+    if (!rolesResult.error) {
+      setRoleAccounts((rolesResult.data || []) as ManagedRoleAccount[]);
+    }
+
     setNewTeacherEmail('');
     setNewTeacherName('');
     setNewTeacherNotes('');
-    setWhitelistFeedback({ type: 'success', message: 'تم حفظ الخادم المعتمد في قاعدة البيانات. سيُحدد دوره عند إنشاء حسابه.' });
+    setNewTeacherGrade('grade-2');
+    setNewAccountRole('teacher');
+
+    const roleLabel = newAccountRole === 'teacher' ? 'خادم' : newAccountRole === 'head' ? 'أمين خدمة' : 'حساب اختبار';
+    setWhitelistFeedback({ type: 'success', message: `تم اعتماد ${cleanEmail} كـ ${roleLabel} بنجاح.` });
     setIsQuickAddModalOpen(false);
   };
 
-  const handleRemoveTeacher = async (id: string, teacherName: string) => {
+  const handleRemoveTeacher = async (idOrEmail: string, teacherName: string) => {
     if (!isHead) return;
-    if (!simulationMode && !window.confirm(`هل أنت متأكد من إلغاء اعتماد الخادم (${teacherName})؟`)) return;
+    if (!simulationMode && !window.confirm(`هل أنت متأكد من إلغاء اعتماد ${teacherName}؟`)) return;
+
+    const isEmail = idOrEmail.includes('@');
+    const id = isEmail ? undefined : idOrEmail;
+    const email = isEmail ? idOrEmail : undefined;
 
     if (simulationMode) {
       setTeachersList((previous) => previous.filter((teacher) => teacher.id !== id));
+      setRoleAccounts((previous) => previous.filter((acc) => acc.email !== email));
       setWhitelistFeedback({ type: 'success', message: `تم إلغاء اعتماد ${teacherName} في المحاكاة فقط.` });
       return;
     }
 
-    const { error } = await supabase.from('teachers_whitelist').delete().eq('id', id);
-    if (error) {
-      setWhitelistFeedback({ type: 'error', message: 'تعذر إلغاء اعتماد الخادم. تحقق من صلاحيات أمين الخدمة.' });
+    // Find the account in either list to get email and role
+    const teacher = id ? teachersList.find((t) => t.id === id) : undefined;
+    const roleAcc = email ? roleAccounts.find((r) => r.email === email) : undefined;
+    const foundEmail = teacher?.email || roleAcc?.email;
+    const role = teacher ? 'teacher' : roleAcc?.role || 'teacher';
+
+    if (!foundEmail) {
+      setWhitelistFeedback({ type: 'error', message: 'تعذر العثور على الحساب.' });
       return;
     }
+
+    // Delete from appropriate table using RPC or direct delete
+    let error: any = null;
+    if (role === 'teacher') {
+      const result = await supabase.from('teachers_whitelist').delete().eq('id', id!);
+      error = result.error;
+    } else if (role === 'head') {
+      const result = await supabase.rpc('revoke_head_account', { p_email: foundEmail });
+      error = result.error;
+    } else if (role === 'test') {
+      const result = await supabase.rpc('revoke_test_account', { p_email: foundEmail });
+      error = result.error;
+    }
+
+    if (error) {
+      setWhitelistFeedback({ type: 'error', message: 'تعذر إلغاء الاعتماد. تحقق من صلاحيات أمين الخدمة.' });
+      return;
+    }
+
+    // Also reset user role to student if they have a profile
+    await supabase.from('users').update({ role: 'student', grade_level: null }).eq('email', email);
+
     setTeachersList((previous) => previous.filter((teacher) => teacher.id !== id));
+    setRoleAccounts((previous) => previous.filter((acc) => acc.id !== id));
     setWhitelistFeedback({ type: 'success', message: `تم إلغاء اعتماد ${teacherName} من قاعدة البيانات.` });
   };
 
@@ -1055,17 +1148,27 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                 >
                   <div className="flex items-center justify-between border-b pb-3">
                     <span className="text-xs text-[#77717A] dark:text-[#B8B1BB]">
-                      إجمالي المعلمين المعتمدين: <strong>{teachersList.length}</strong>
+                      إجمالي الحسابات المعتمدة: <strong>{teachersList.length + roleAccounts.length}</strong>
+                      <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
+                        {teachersList.length} خادم
+                      </span>
+                      <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold">
+                        {roleAccounts.filter(r => r.role === 'head').length} أمين خدمة
+                      </span>
+                      <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 font-semibold">
+                        {roleAccounts.filter(r => r.role === 'test').length} اختبار
+                      </span>
                     </span>
                     <h2 className="text-base font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                      قائمة الخدام المعتمدين
+                      قائمة الحسابات المعتمدة
                     </h2>
                   </div>
 
                   <div className="space-y-2.5">
+                    {/* Teachers */}
                     {teachersList.map((teacher) => (
                       <div
-                        key={teacher.id}
+                        key={`teacher-${teacher.id}`}
                         className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all hover:scale-[1.01]"
                         style={{
                           backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
@@ -1088,11 +1191,12 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                                 {teacher.name}
                               </span>
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
-                                معتمد
+                                خادم
                               </span>
                             </div>
                             <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono" dir="ltr">
                               {teacher.email}
+                              {teacher.assignedGrade && ` · ${teacher.assignedGrade === 'grade-1' ? 'الصف السابع' : teacher.assignedGrade === 'grade-2' ? 'الصف الثامن' : 'الصف التاسع'}`}
                             </p>
                           </div>
                         </div>
@@ -1100,6 +1204,69 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                         <button
                           onClick={() => handleRemoveTeacher(teacher.id, teacher.name)}
                           title="إلغاء اعتماد الخادم"
+                          className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                          style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Heads & Test Accounts */}
+                    {roleAccounts.map((acc) => (
+                      <div
+                        key={`role-${acc.email}`}
+                        className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all hover:scale-[1.01]"
+                        style={{
+                          backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
+                          borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
+                            style={{
+                              backgroundColor: acc.role === 'head'
+                                ? (theme === 'dark' ? '#38232C' : '#F3E7EB')
+                                : (theme === 'dark' ? '#2D2335' : '#F0E8F5'),
+                              color: acc.role === 'head'
+                                ? (theme === 'dark' ? '#B65370' : '#76243A')
+                                : (theme === 'dark' ? '#A855F7' : '#7C3AED'),
+                            }}
+                          >
+                            {acc.role === 'head' ? 'أم' : acc.role === 'test' ? 'تج' : 'خـ'}
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+                                {acc.name || acc.email}
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                                style={{
+                                  backgroundColor: acc.role === 'head'
+                                    ? 'rgba(182, 83, 112, 0.1)'
+                                    : acc.role === 'test'
+                                      ? 'rgba(168, 85, 247, 0.1)'
+                                      : 'rgba(34, 197, 94, 0.1)',
+                                  color: acc.role === 'head'
+                                    ? (theme === 'dark' ? '#B65370' : '#76243A')
+                                    : acc.role === 'test'
+                                      ? (theme === 'dark' ? '#A855F7' : '#7C3AED')
+                                      : (theme === 'dark' ? '#75C695' : '#347653'),
+                                }}
+                              >
+                                {acc.role === 'head' ? 'أمين خدمة' : acc.role === 'test' ? 'اختبار' : 'خادم'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono" dir="ltr">
+                              {acc.email}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleRemoveTeacher(acc.email, acc.name || acc.email)}
+                          title={`إلغاء اعتماد ${acc.role === 'head' ? 'أمين الخدمة' : acc.role === 'test' ? 'حساب الاختبار' : 'الخادم'}`}
                           className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                           style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
                         >
@@ -1147,7 +1314,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
 
             <form onSubmit={handleAddTeacher} className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-xs font-semibold block">إيميل المعلم / الخادم:</label>
+                <label className="text-xs font-semibold block">إيميل المعلم / الخادم / أمين الخدمة:</label>
                 <input
                   type="email"
                   required
@@ -1165,7 +1332,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold block">اسم الخادم (اختياري):</label>
+                <label className="text-xs font-semibold block">اسم الحساب (اختياري):</label>
                 <input
                   type="text"
                   placeholder="مثال: أ/ يوحنا"
@@ -1179,6 +1346,44 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                   }}
                 />
               </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold block">الصلاحية:</label>
+                <select
+                  value={newAccountRole}
+                  onChange={(e) => setNewAccountRole(e.target.value as ManagedRoleAccount['role'])}
+                  className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
+                    borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
+                    color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                  }}
+                >
+                  <option value="teacher">خادم فصلي (Teacher)</option>
+                  <option value="head">أمين خدمة عام (Head)</option>
+                  <option value="test">حساب اختبار (Test)</option>
+                </select>
+              </div>
+
+              {newAccountRole === 'teacher' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold block">الفصل المسند إليه:</label>
+                  <select
+                    value={newTeacherGrade}
+                    onChange={(e) => setNewTeacherGrade(e.target.value as MiddleSchoolGrade)}
+                    className="w-full px-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
+                    style={{
+                      backgroundColor: theme === 'dark' ? '#2A2730' : '#FFFFFF',
+                      borderColor: theme === 'dark' ? '#3A3540' : '#E7E2E0',
+                      color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                    }}
+                  >
+                    <option value="grade-1">الصف الأول الإعدادي (7th)</option>
+                    <option value="grade-2">الصف الثاني الإعدادي (8th)</option>
+                    <option value="grade-3">الصف الثالث الإعدادي (9th)</option>
+                  </select>
+                </div>
+              )}
 
               <button
                 type="submit"

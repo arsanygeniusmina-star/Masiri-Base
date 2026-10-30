@@ -34,6 +34,16 @@ export interface TeacherWhitelistEntry {
   status: 'active' | 'invited';
 }
 
+export interface ManagedRoleAccount {
+  id?: string;
+  email: string;
+  name: string;
+  role: 'teacher' | 'head' | 'test';
+  assigned_grade?: MiddleSchoolGrade | null;
+  status: 'active' | 'invited';
+  created_at?: string;
+}
+
 export interface DailySpiritualTask {
   id: string;
   title: string;
