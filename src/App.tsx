@@ -16,6 +16,7 @@ import { MyReadingsScreen } from './screens/MyReadingsScreen';
 import { BibleStudyScreen } from './screens/BibleStudyScreen';
 import { RankingScreen } from './screens/RankingScreen';
 import { ComingSoon } from './components/ComingSoon';
+import { FeedScreen } from './screens/FeedScreen';
 import { TestRoleSwitcher } from './components/TestRoleSwitcher';
 import { JourneyTransition } from './components/JourneyTransition';
 import { LogoBackdrop } from './components/LogoBackdrop';
@@ -26,15 +27,15 @@ import { startTestRuntimeLogCapture } from './lib/testRuntimeLogs';
 const dashboardFor = (user: User): AppScreen =>
   user.role === 'student' ? 'student-dashboard' : 'servant-dashboard';
 
-// Students land on «إصحاح النهارده», servants on «الترتيب».
+// Everyone lands on «إصحاح النهارده».
 const authenticatedHomeFor = (user: User): AppScreen =>
-  user.role === 'test' ? 'test' : user.role === 'student' ? 'my-readings' : 'ranking';
+  user.role === 'test' ? 'test' : 'my-readings';
 
 /**
  * Pages that are not open yet: they show only the blurred background with
  * "Coming Soon". Remove a screen from this list to open it again.
  */
-const COMING_SOON_SCREENS: AppScreen[] = ['get-started', 'dashboard', 'student-dashboard', 'servant-dashboard'];
+const COMING_SOON_SCREENS: AppScreen[] = ['dashboard', 'student-dashboard', 'servant-dashboard'];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -129,7 +130,6 @@ export default function App() {
           setCurrentScreen((previousScreen) => {
             if (profile.role === 'test') return previousScreen;
             // Leave reading screens that the refreshed role may no longer open.
-            if (previousScreen === 'my-readings' && profile.role !== 'student') return dashboardFor(profile);
             if (previousScreen === 'bible-study' && profile.role !== 'teacher' && profile.role !== 'head') return dashboardFor(profile);
             return previousScreen === 'dashboard' ||
               previousScreen === 'student-dashboard' ||
@@ -269,7 +269,7 @@ export default function App() {
       }
       const effectiveRole = currentUser.role === 'test' && previewRole ? previewRole : currentUser.role;
       const allowed = screen === 'my-readings'
-        ? effectiveRole === 'student'
+        ? effectiveRole === 'student' || effectiveRole === 'teacher' || effectiveRole === 'head'
         : effectiveRole === 'teacher' || effectiveRole === 'head';
       if (!allowed) return;
     }
@@ -321,8 +321,8 @@ export default function App() {
     handleNavigate('my-readings');
   };
 
-  // Reading Streak shown next to the student's name in the top bar on every page.
-  const topBarStreak = useReadingStreak(displayUser?.id, displayUser?.role === 'student', simulationMode, displayUser?.streakDays ?? 0);
+  // Reading Streak shown next to the user's name in the top bar on every page.
+  const topBarStreak = useReadingStreak(displayUser?.id, displayUser?.role === 'student' || displayUser?.role === 'teacher' || displayUser?.role === 'head', simulationMode, displayUser?.streakDays ?? 0);
 
   const renderDashboard = () => {
     if (!displayUser || !currentUser) return null;
@@ -394,7 +394,10 @@ export default function App() {
               <ComingSoon theme={theme} />
             ) : (
             <>
-            {currentScreen === 'get-started' && (
+            {currentScreen === 'get-started' && currentUser && currentUser.role !== 'test' && displayUser && (
+              <FeedScreen currentUser={displayUser} theme={theme} simulationMode={simulationMode} />
+            )}
+            {currentScreen === 'get-started' && (!currentUser || currentUser.role === 'test') && (
               <GetStartedScreen onNavigate={handleNavigate} currentUser={currentUser} theme={theme} />
             )}
             {currentScreen === 'login' && (
@@ -425,7 +428,7 @@ export default function App() {
               ) : renderDashboard()
             )}
             {currentScreen === 'supabase' && currentUser?.role === 'head' && <SupabaseScreen theme={theme} />}
-            {currentScreen === 'my-readings' && displayUser?.role === 'student' && (
+            {currentScreen === 'my-readings' && displayUser && displayUser.role !== 'test' && (
               <MyReadingsScreen
                 currentUser={displayUser}
                 theme={theme}

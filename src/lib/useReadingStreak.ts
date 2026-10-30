@@ -3,7 +3,7 @@ import { fetchReadingAssignments, fetchReadingCompletions, fetchReadingStreaks, 
 import { addDaysToKey, localDateKey, readingWeekStart } from './readingDates';
 import { READINGS_PREVIEW_MODE, loadPreviewReadings } from './readingsPreview';
 
-const STREAK_CHANGED_EVENT = 'masiri:reading-streak-changed';
+export const STREAK_CHANGED_EVENT = 'masiri:reading-streak-changed';
 
 export interface StreakState {
   value: number;
