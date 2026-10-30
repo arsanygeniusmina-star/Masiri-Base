@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Camera, CalendarDays, CheckCircle2, Circle, Clock, Loader2, RefreshCw, RotateCcw, Send } from 'lucide-react';
 import type { ReadingAnswer, ReadingAssignment, ReadingCompletion, ReadingStreak, User } from '../types';
+import { NoPasteTextarea } from '../components/ui/animated-card';
 import {
   buildDemoReadingData,
   creditedDateOf,
@@ -335,7 +337,12 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" dir="rtl">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" dir="rtl"
+    >
       {/* Header + streak */}
       <div className="liquid-glass-card relative flex flex-col gap-5 overflow-hidden rounded-3xl p-6 sm:p-7 md:flex-row md:items-center md:justify-between">
         <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-[#C5A15A]/15 blur-2xl" />
@@ -382,44 +389,70 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
       ) : (
         <>
           {/* Daily reminder verse (آية اليوم) */}
-          {todays[0] && (
-            <DailyVerseCard
-              theme={theme}
-              assignment={todays[0]}
-              completed={completionByAssignment.has(todays[0].id)}
-              today={today}
-              simulationMode={simulationMode}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            {todays[0] && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.3 }}
+              >
+                <DailyVerseCard
+                  theme={theme}
+                  assignment={todays[0]}
+                  completed={completionByAssignment.has(todays[0].id)}
+                  today={today}
+                  simulationMode={simulationMode}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Today's selector when there is more than one reading */}
-          {todays.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {todays.map((assignment) => {
-                const done = completionByAssignment.has(assignment.id);
-                return (
-                  <button
-                    key={assignment.id}
-                    type="button"
-                    onClick={() => setFocusId(assignment.id)}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-bold"
-                    style={{
-                      backgroundColor: focusId === assignment.id ? p.soft : 'transparent',
-                      color: focusId === assignment.id ? p.accentText : p.muted,
-                      border: `1px solid ${focusId === assignment.id ? p.softBorder : p.border}`,
-                    }}
-                  >
-                    {done ? <CheckCircle2 className="h-4 w-4" style={{ color: p.success }} /> : <Clock className="h-4 w-4" />}
-                    {assignment.passage.reference}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {todays.length > 1 && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.3 }}
+                className="flex gap-2 overflow-x-auto pb-1"
+              >
+                {todays.map((assignment) => {
+                  const done = completionByAssignment.has(assignment.id);
+                  return (
+                    <motion.button
+                      key={assignment.id}
+                      type="button"
+                      onClick={() => setFocusId(assignment.id)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.96 }}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-bold"
+                      style={{
+                        backgroundColor: focusId === assignment.id ? p.soft : 'transparent',
+                        color: focusId === assignment.id ? p.accentText : p.muted,
+                        border: `1px solid ${focusId === assignment.id ? p.softBorder : p.border}`,
+                      }}
+                    >
+                      {done ? <CheckCircle2 className="h-4 w-4" style={{ color: p.success }} /> : <Clock className="h-4 w-4" />}
+                      {assignment.passage.reference}
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Focus reading */}
           {focus ? (
-            <article className="liquid-glass-card space-y-5 rounded-3xl p-5 sm:p-7" aria-labelledby="focus-reading-title">
+            <motion.article
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              whileHover={{ y: -2 }}
+              className="liquid-glass-card space-y-5 rounded-3xl p-5 sm:p-7" aria-labelledby="focus-reading-title"
+            >
               <header className="flex flex-wrap items-start justify-between gap-3 border-b pb-4" style={{ borderColor: p.divider }}>
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold" style={{ color: focus.scheduledDate < today ? p.error : p.accent }}>
@@ -437,12 +470,21 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
               </header>
 
               <div className="space-y-3">
-                {focus.passage.verses.map((verse) => (
-                  <p key={verse.number} className="text-lg leading-10 sm:text-xl sm:leading-[2.6rem]" style={{ color: p.text }}>
-                    <sup className="ml-1 text-xs font-black" style={{ color: p.accentText }}>{toArabicDigits(verse.number)}</sup>
-                    {verse.text}
-                  </p>
-                ))}
+                <AnimatePresence mode="wait">
+                  {focus.passage.verses.map((verse) => (
+                    <motion.p
+                      key={verse.number}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -8 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-lg leading-10 sm:text-xl sm:leading-[2.6rem]" style={{ color: p.text }}
+                    >
+                      <sup className="ml-1 text-xs font-black" style={{ color: p.accentText }}>{toArabicDigits(verse.number)}</sup>
+                      {verse.text}
+                    </motion.p>
+                  ))}
+                </AnimatePresence>
                 {focus.passage.verses.length === 0 && (
                   <p className="text-sm" style={{ color: p.muted }}>لا يتوفر نص هذه القراءة حاليًا.</p>
                 )}
@@ -454,7 +496,7 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
                     {!focusCompletion && <span className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs" style={{ backgroundColor: p.primary, color: '#F3DEAB' }}>١</span>}
                     سؤال للتأمل: {focus.questionText}
                   </label>
-                  <textarea
+                  <NoPasteTextarea
                     id="reading-answer"
                     value={answerDraft}
                     onChange={(event) => setAnswerDraft(event.target.value.slice(0, 2000))}
@@ -534,19 +576,23 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
 
               <div className="flex flex-wrap items-center gap-3">
                 {!focusCompletion ? (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.96 }}
                     type="button"
                     onClick={() => void handleMarkRead()}
                     disabled={submitting || !canComplete}
-                    className="inline-flex items-center gap-2 rounded-2xl px-6 py-3.5 text-base font-black shadow-lg transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-2xl px-6 py-3.5 text-base font-black shadow-lg disabled:opacity-60"
                     style={primaryButtonStyle(p)}
                   >
                     {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
                     تمت القراءة
-                  </button>
+                  </motion.button>
                 ) : (
                   focus.questionText && (
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.96 }}
                       type="button"
                       onClick={() => void handleSaveAnswer()}
                       disabled={submitting || answerDraft.trim() === (focusAnswer?.answerText ?? '')}
@@ -555,12 +601,12 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
                     >
                       {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       {focusAnswer ? 'حفظ التعديل' : 'إرسال الإجابة'}
-                    </button>
+                    </motion.button>
                   )
                 )}
                 {answerSaved && <span className="text-sm font-bold" style={{ color: p.success }}>تم حفظ إجابتك ✓</span>}
               </div>
-            </article>
+            </motion.article>
           ) : (
             <div className="liquid-glass-card rounded-3xl p-10 text-center">
               <BookOpen className="mx-auto h-10 w-10" style={{ color: p.accent }} />
@@ -574,6 +620,6 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
       )}
 
       {cameraOpen && <CameraCapture theme={theme} onCapture={handleCameraPhoto} onClose={() => setCameraOpen(false)} />}
-    </div>
+    </motion.div>
   );
 };

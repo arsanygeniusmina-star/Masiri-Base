@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { User, DailySpiritualTask, MemoryVerse, AchievementBadge, PrayerRequest } from '../types';
 import { Database, CURRENT_WEEK_VERSE } from '../db/storage';
 import { supabase, fetchUserProfile } from '../lib/supabase';
@@ -7,6 +8,7 @@ import { DailyVerseCard } from '../components/readings/DailyVerseCard';
 import { StreakBadge } from '../components/readings/StreakBadge';
 import { useReadingStreak } from '../lib/useReadingStreak';
 import { READINGS_PREVIEW_MODE, loadPreviewReadings } from '../lib/readingsPreview';
+import { NoPasteTextarea } from '../components/ui/animated-card';
 import type { ReadingAssignment } from '../types';
 import { localDateKey } from '../lib/readingDates';
 import {
@@ -325,7 +327,12 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 relative">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 relative"
+    >
       {(dashboardError || (tasksLoading && 'جاري تحميل مهامك من قاعدة البيانات...')) && (
         <div role={dashboardError ? 'alert' : 'status'} className="relative z-10 rounded-2xl border p-3.5 text-sm"
           style={{
@@ -342,23 +349,34 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
       <div className="absolute bottom-10 left-10 w-96 h-96 rounded-full bg-[#C5A15A]/15 dark:bg-[#D6B878]/10 blur-3xl pointer-events-none" />
 
       {/* Confetti Celebration Banner when all tasks completed */}
-      {showConfettiNotice && (
-        <div className="p-4 rounded-3xl border text-sm flex items-center justify-between gap-3 text-right shadow-2xl animate-in slide-in-from-top-4 duration-300 church-btn-primary">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-xl shrink-0">
-              🎉
+      <AnimatePresence mode="wait">
+        {showConfettiNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="p-4 rounded-3xl border text-sm flex items-center justify-between gap-3 text-right shadow-2xl church-btn-primary"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-xl shrink-0">
+                🎉
+              </div>
+              <div>
+                <h4 className="font-black text-sm">مبارك! أكملت جميع مهام مسارك الروحي لليوم! ✝️</h4>
+                <p className="text-xs opacity-90">حافظت على شعلة الالتزام وحصلت على النقاط كاملة!</p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-black text-sm">مبارك! أكملت جميع مهام مسارك الروحي لليوم! ✝️</h4>
-              <p className="text-xs opacity-90">حافظت على شعلة الالتزام وحصلت على النقاط كاملة!</p>
-            </div>
-          </div>
-          <Sparkles className="w-6 h-6 text-yellow-300 shrink-0 glow-pulse" />
-        </div>
-      )}
+            <Sparkles className="w-6 h-6 text-yellow-300 shrink-0 glow-pulse" />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Student Welcome & Gamification Banner - Super Liquid Glassmorphism */}
-      <div
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
         className="liquid-glass-card rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden backdrop-blur-3xl"
       >
         {/* Decorative Caustic Liquid Ring */}
@@ -444,26 +462,37 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
             </p>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Daily reminder verse (آية اليوم) */}
-      {todayReading && (
-        <DailyVerseCard
-          theme={theme}
-          assignment={todayReading.assignment}
-          completed={todayReading.completed}
-          today={todayKey}
-          onOpen={onOpenReadings}
-          simulationMode={simulationMode}
-        />
-      )}
+      <AnimatePresence mode="wait">
+        {todayReading && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.3 }}
+          >
+            <DailyVerseCard
+              theme={theme}
+              assignment={todayReading.assignment}
+              completed={todayReading.completed}
+              today={todayKey}
+              onOpen={onOpenReadings}
+              simulationMode={simulationMode}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Daily readings shortcut (إصحاح النهارده) */}
       {onOpenReadings && (
-        <button
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
           type="button"
           onClick={onOpenReadings}
-          className="liquid-glass-card w-full rounded-3xl p-5 flex items-center justify-between gap-4 text-right transition-all hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
+          className="liquid-glass-card w-full rounded-3xl p-5 flex items-center justify-between gap-4 text-right transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
         >
           <span className="flex items-center gap-3 min-w-0">
             <span
@@ -480,11 +509,16 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
             </span>
           </span>
           <ChevronLeft className="w-5 h-5 shrink-0" style={{ color: theme === 'dark' ? '#D6B878' : '#C5A15A' }} />
-        </button>
+        </motion.button>
       )}
 
       {/* Main Grid: Checklist + Weekly Verse */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+      >
         {/* Left Column: Daily Spiritual Tasks Checklist */}
         <div className="lg:col-span-7 space-y-6">
           <div
@@ -500,11 +534,14 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
             </div>
 
             <div className="space-y-3">
-              {tasks.map((task) => (
-                <div
-                  key={task.id}
-                  onClick={() => handleToggleTask(task.id)}
-                  className="p-4 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer select-none transition-all hover:scale-[1.01] active:scale-[0.99] backdrop-blur-md"
+              <AnimatePresence mode="wait">
+                {tasks.map((task) => (
+                  <motion.div
+                    key={task.id}
+                    onClick={() => handleToggleTask(task.id)}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="p-4 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer select-none backdrop-blur-md"
                   style={{
                     backgroundColor: task.completed
                       ? theme === 'dark'
@@ -564,8 +601,9 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
                   >
                     +{task.points} ن
                   </span>
-                </div>
-              ))}
+                </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
 
@@ -751,7 +789,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
             )}
 
             <form onSubmit={handleSendPrayer} className="space-y-3.5">
-              <textarea
+              <NoPasteTextarea
                 required
                 rows={3}
                 value={prayerContent}
@@ -819,7 +857,7 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Badge Inspect Modal for Middle School Students */}
       {selectedBadge && (
@@ -868,6 +906,6 @@ export const StudentDashboardScreen: React.FC<StudentDashboardScreenProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
