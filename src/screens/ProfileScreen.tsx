@@ -617,17 +617,17 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
   });
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 relative">
+    <div className="max-w-6xl mx-auto py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 relative overflow-x-clip">
       {/* Background Ambient Glow */}
-      <div className="absolute top-10 right-10 w-96 h-96 rounded-full bg-[#76243A]/15 dark:bg-[#B65370]/15 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-96 h-96 rounded-full bg-[#C5A15A]/15 dark:bg-[#D6B878]/10 blur-3xl pointer-events-none" />
+      <div className="absolute top-10 right-0 sm:right-10 w-64 sm:w-96 h-64 sm:h-96 rounded-full bg-[#76243A]/15 dark:bg-[#B65370]/15 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-0 sm:left-10 w-64 sm:w-96 h-64 sm:h-96 rounded-full bg-[#C5A15A]/15 dark:bg-[#D6B878]/10 blur-3xl pointer-events-none" />
 
       {/* Top Profile Card Banner - Super Liquid Glassmorphism */}
       <div
-        className="rounded-3xl border p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden liquid-glass-card backdrop-blur-3xl"
+        className="rounded-3xl border p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center md:items-start gap-4 sm:gap-6 relative overflow-hidden liquid-glass-card backdrop-blur-3xl max-w-full"
       >
-        <div className="flex items-center gap-4 sm:gap-6 relative">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full min-w-0">
+          <div className="relative shrink-0">
             <div
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shrink-0 transition-transform hover:scale-105 overflow-hidden border"
               style={{
@@ -676,10 +676,10 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
             )}
           </div>
 
-          <div className="space-y-1.5 text-right">
+          <div className="space-y-1.5 text-right min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1
-                className="text-2xl sm:text-3xl font-extrabold"
+                className="text-xl sm:text-3xl font-extrabold break-words leading-tight"
                 style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
               >
                 {currentUser.name}
@@ -719,7 +719,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               </span>
             </div>
 
-            <p className="text-xs sm:text-sm font-mono text-[#77717A] dark:text-[#B8B1BB]" dir="ltr">
+            <p className="text-xs sm:text-sm font-mono text-[#77717A] dark:text-[#B8B1BB] break-all" dir="ltr">
               {currentUser.email}
             </p>
 
@@ -742,7 +742,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
         </div>
 
         {/* Head's Quick Plus Button to Add Teacher & Action Cards */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end border-t md:border-t-0 pt-4 md:pt-0">
+        <div className="grid grid-cols-2 gap-2.5 w-full md:flex md:flex-wrap md:items-center md:justify-end md:gap-3 md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
           {/* USER REQUIREMENT: Head has a part to add teachers with a PLUS BUTTON (+) */}
           {isHead && (
             <button
@@ -750,7 +750,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                 setActiveTab('teachers');
                 setIsQuickAddModalOpen(true);
               }}
-              className="px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg hover:scale-105 active:scale-95 transition-all church-btn-primary"
+              className="col-span-2 md:col-span-1 w-full md:w-auto px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-105 active:scale-95 transition-all church-btn-primary"
               style={{
                 background:
                   theme === 'dark'
@@ -774,7 +774,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
           )}
 
           <div
-            className="p-3 rounded-2xl border text-center min-w-[90px] backdrop-blur-md"
+            className="p-3 rounded-2xl border text-center w-full min-w-0 md:min-w-[90px] backdrop-blur-md"
             style={{
               backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(242, 240, 237, 0.7)',
               borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
@@ -786,17 +786,17 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
           </div>
 
           <div
-            className="p-3 rounded-2xl border text-center min-w-[90px] backdrop-blur-md"
+            className="p-3 rounded-2xl border text-center w-full min-w-0 md:min-w-[90px] backdrop-blur-md"
             style={{
               backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(242, 240, 237, 0.7)',
               borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
             }}
           >
-            <div className="flex items-center justify-center gap-1 text-xs text-[#77717A] dark:text-[#B8B1BB]">
-              <Award className="w-3.5 h-3.5 text-[#76243A] dark:text-[#B65370]" />
-              <span>نقاط THE APOSTLES</span>
+            <div className="flex items-center justify-center gap-1 text-[11px] sm:text-xs text-[#77717A] dark:text-[#B8B1BB]">
+              <Award className="w-3.5 h-3.5 text-[#76243A] dark:text-[#B65370] shrink-0" />
+              <span className="truncate">نقاط THE APOSTLES</span>
             </div>
-            <p className="text-xl font-bold font-mono mt-0.5" style={{ color: theme === 'dark' ? '#B65370' : '#76243A' }}>
+            <p className="text-lg sm:text-xl font-bold font-mono mt-0.5" style={{ color: theme === 'dark' ? '#B65370' : '#76243A' }}>
               {currentUser.points}
             </p>
           </div>
@@ -805,34 +805,36 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
 
       {/* Tabs Row */}
       <div
-        className="flex items-center justify-between border-b pb-2"
+        className="flex flex-col sm:flex-row gap-2 sm:gap-3 border-b pb-3 overflow-x-auto sm:overflow-visible"
         style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
       >
-        <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <button
             onClick={() => setActiveTab('profile')}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap"
+            className="flex-1 sm:flex-1 md:flex-1 lg:auto px-3 sm:px-4 py-2 rounded-xl text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5"
             style={{
               backgroundColor: activeTab === 'profile' ? (theme === 'dark' ? '#76243A' : '#F3E7EB') : 'transparent',
               color: activeTab === 'profile' ? (theme === 'dark' ? '#F3DEAB' : '#76243A') : (theme === 'dark' ? '#B8B1BB' : '#77717A'),
               border: activeTab === 'profile' ? `1px solid ${theme === 'dark' ? 'rgba(214, 184, 120, 0.45)' : '#DFC0CA'}` : '1px solid transparent',
             }}
           >
-            بيانات الملف الشخصي
+            <span className="sm:hidden">الملف الشخصي</span>
+            <span className="hidden sm:inline">بيانات الملف الشخصي</span>
           </button>
 
           {/* Tab 2: Exclusively for Head or showing lock for teachers */}
           <button
             onClick={() => setActiveTab('teachers')}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap"
+            className="flex-1 sm:flex-1 md:flex-1 lg:auto px-3 sm:px-4 py-2 rounded-xl text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5"
             style={{
               backgroundColor: activeTab === 'teachers' ? (theme === 'dark' ? '#76243A' : '#F3E7EB') : 'transparent',
               color: activeTab === 'teachers' ? (theme === 'dark' ? '#F3DEAB' : '#76243A') : (theme === 'dark' ? '#B8B1BB' : '#77717A'),
               border: activeTab === 'teachers' ? `1px solid ${theme === 'dark' ? 'rgba(214, 184, 120, 0.45)' : '#DFC0CA'}` : '1px solid transparent',
             }}
           >
-            {isHead ? <ShieldCheck className="w-4 h-4 text-[#76243A] dark:text-[#D6B878]" /> : <Lock className="w-4 h-4 text-[#77717A]" />}
-            <span>إدارة الخدام والمعلمين</span>
+            {isHead ? <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-[#76243A] dark:text-[#D6B878]" /> : <Lock className="w-3.5 h-3.5 shrink-0 text-[#77717A]" />}
+            <span className="sm:hidden">الخدام</span>
+            <span className="hidden sm:inline">إدارة الخدام والمعلمين</span>
             {isHead && (
               <span
                 className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold"
@@ -851,15 +853,15 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
           {(isHead || isTeacher) && (
             <button
               onClick={() => setActiveTab('students')}
-              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap"
+              className="flex-1 sm:flex-1 md:flex-1 lg:auto px-3 sm:px-4 py-2 rounded-xl text-[11px] sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5"
               style={{
                 backgroundColor: activeTab === 'students' ? (theme === 'dark' ? '#76243A' : '#F3E7EB') : 'transparent',
                 color: activeTab === 'students' ? (theme === 'dark' ? '#F3DEAB' : '#76243A') : (theme === 'dark' ? '#B8B1BB' : '#77717A'),
                 border: activeTab === 'students' ? `1px solid ${theme === 'dark' ? 'rgba(214, 184, 120, 0.45)' : '#DFC0CA'}` : '1px solid transparent',
               }}
             >
-              <Users className="w-4 h-4" />
-              <span>الطلاب</span>
+              <Users className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">الطلاب</span>
               <span
                 className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold"
                 style={{
@@ -873,23 +875,14 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
             </button>
           )}
         </div>
-
-        {/* Supabase connection guide button */}
-        <button
-          onClick={() => setIsSupabaseGuideOpen(true)}
-          className="text-xs font-bold text-[#C5A15A] dark:text-[#D6B878] hover:underline flex items-center gap-1 shrink-0"
-        >
-          <HelpCircle className="w-4 h-4" />
-          <span className="hidden sm:inline">دليل ربط Supabase و Cloud SQL</span>
-        </button>
       </div>
 
       {/* Tab 1: Profile Edit Form */}
       {activeTab === 'profile' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+          <div className="lg:col-span-2 space-y-6 min-w-0">
             <div
-              className="rounded-3xl border p-6 sm:p-8 space-y-6 liquid-glass-card backdrop-blur-3xl"
+              className="rounded-3xl border p-4 sm:p-6 space-y-6 liquid-glass-card backdrop-blur-3xl min-w-0"
             >
               <div className="border-b pb-3 text-right">
                 <h2 className="text-lg font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
@@ -1042,7 +1035,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
           </div>
 
           {/* Right Column: Role Privileges & Info Card */}
-          <div className="space-y-6">
+          <div className="lg:col-span-1 space-y-6 min-w-0">
             <div
               className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right liquid-glass-card backdrop-blur-3xl"
             >
@@ -1228,9 +1221,9 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
               {/* Add New Teacher Form with the Plus Button Feature */}
-              <div className="lg:col-span-5 space-y-4">
+              <div className="lg:col-span-2 space-y-4 min-w-0">
                 <div
                   className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right backdrop-blur-2xl shadow-xl"
                   style={{
@@ -1363,7 +1356,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               </div>
 
               {/* Whitelisted Teachers Roster Table */}
-              <div className="lg:col-span-7 space-y-4">
+              <div className="lg:col-span-1 space-y-4 min-w-0">
                 <div
                   className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right backdrop-blur-2xl shadow-xl"
                   style={{
@@ -1374,8 +1367,8 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                     borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.8)',
                   }}
                 >
-                  <div className="flex items-center justify-between border-b pb-3">
-                    <span className="text-xs text-[#77717A] dark:text-[#B8B1BB]">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
+                    <span className="flex flex-wrap items-center gap-1.5 text-xs text-[#77717A] dark:text-[#B8B1BB]">
                       إجمالي الحسابات المعتمدة: <strong>{teachersList.length + roleAccounts.length}</strong>
                       <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
                         {teachersList.length} خادم
@@ -1403,7 +1396,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                           borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                         }}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <div
                             className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
                             style={{
@@ -1413,7 +1406,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                           >
                             خـ
                           </div>
-                          <div className="text-right">
+                          <div className="text-right min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
                                 {teacher.name}
@@ -1422,7 +1415,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                                 خادم
                               </span>
                             </div>
-                            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono" dir="ltr">
+                            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono break-all" dir="ltr">
                               {teacher.email}
                               {teacher.assignedGrade && ` · ${teacher.assignedGrade === 'grade-1' ? 'الصف السابع' : teacher.assignedGrade === 'grade-2' ? 'الصف الثامن' : 'الصف التاسع'}`}
                             </p>
@@ -1450,7 +1443,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                           borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                         }}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <div
                             className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
                             style={{
@@ -1464,7 +1457,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                           >
                             {acc.role === 'head' ? 'أم' : acc.role === 'test' ? 'تج' : 'خـ'}
                           </div>
-                          <div className="text-right">
+                          <div className="text-right min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
                                 {acc.name || acc.email}
@@ -1486,7 +1479,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                                 {acc.role === 'head' ? 'أمين خدمة' : acc.role === 'test' ? 'اختبار' : 'خادم'}
                               </span>
                             </div>
-                            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono" dir="ltr">
+                            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono break-all" dir="ltr">
                               {acc.email}
                             </p>
                           </div>
