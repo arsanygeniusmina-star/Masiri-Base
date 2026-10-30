@@ -69,3 +69,9 @@ Streak rules: a day counts when the student completed one or more readings that 
 1. Open **قراءاتي** in the navigation bar, or use the card on the dashboard.
 2. Read today's passage, answer the question (if there is one), then press **افتح الكاميرا والتقط صورة** and take a photo with the phone camera. **تمت القراءة** unlocks only when both are done, and the **Streak** (on the dashboard and in قراءاتي) updates immediately.
 3. Missed readings stay available as catch-up. Upcoming readings are listed but locked until their date.
+
+## 6. «الترتيب» (ranking) and Coming Soon pages
+
+* **الترتيب** replaced «مشواري» in the navigation bar. It lists every student ranked by points (highest first, ties share a rank), with 🥇🥈🥉 for the top three and the signed-in student highlighted. Data comes from `public.get_points_leaderboard()` (migration `20261030030000_points_leaderboard.sql`). It is available to signed-in students, servants and head servants, and exposes only name, points, grade and photo.
+* Pages not open yet (الرئيسية, حسابي and the dashboards) show only the blurred background with **COMING SOON**. To reopen one, remove it from `COMING_SOON_SCREENS` in `src/App.tsx`.
+* After sign-in, students land on «إصحاح النهارده» and servants land on «الترتيب».

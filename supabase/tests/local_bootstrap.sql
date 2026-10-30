@@ -7,7 +7,7 @@ grant usage on schema public to anon, authenticated;
 create type public.user_role as enum ('head','teacher','student');
 alter type public.user_role add value 'test';
 create type public.middle_school_grade as enum ('grade-1','grade-2','grade-3');
-create table public.users (id uuid primary key, email text not null, name text not null, role public.user_role not null default 'student', grade_level public.middle_school_grade);
+create table public.users (id uuid primary key, email text not null, name text not null, role public.user_role not null default 'student', grade_level public.middle_school_grade, points integer default 0, avatar_url text);
 alter table public.users enable row level security;
 create schema private; revoke all on schema private from public, anon; grant usage on schema private to authenticated;
 create or replace function private.current_app_role() returns text language sql stable security definer set search_path = '' as $f$ select u.role::text from public.users u where u.id = (select auth.uid()) limit 1 $f$;

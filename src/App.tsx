@@ -14,6 +14,8 @@ import { Database } from './db/storage';
 import { TestDashboardScreen } from './screens/TestDashboardScreen';
 import { MyReadingsScreen } from './screens/MyReadingsScreen';
 import { BibleStudyScreen } from './screens/BibleStudyScreen';
+import { RankingScreen } from './screens/RankingScreen';
+import { ComingSoon } from './components/ComingSoon';
 import { TestRoleSwitcher } from './components/TestRoleSwitcher';
 import { JourneyTransition } from './components/JourneyTransition';
 import { LogoBackdrop } from './components/LogoBackdrop';
@@ -24,8 +26,15 @@ import { startTestRuntimeLogCapture } from './lib/testRuntimeLogs';
 const dashboardFor = (user: User): AppScreen =>
   user.role === 'student' ? 'student-dashboard' : 'servant-dashboard';
 
+// Students land on «إصحاح النهارده», servants on «الترتيب».
 const authenticatedHomeFor = (user: User): AppScreen =>
-  user.role === 'test' ? 'test' : dashboardFor(user);
+  user.role === 'test' ? 'test' : user.role === 'student' ? 'my-readings' : 'ranking';
+
+/**
+ * Pages that are not open yet: they show only the blurred background with
+ * "Coming Soon". Remove a screen from this list to open it again.
+ */
+const COMING_SOON_SCREENS: AppScreen[] = ['get-started', 'profile', 'dashboard', 'student-dashboard', 'servant-dashboard'];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -72,8 +81,9 @@ export default function App() {
   // page is open, show the login page instead of an empty screen.
   useEffect(() => {
     if (!sessionReady || currentUser) return;
-    const signedInOnly: AppScreen[] = ['dashboard', 'student-dashboard', 'servant-dashboard', 'my-readings', 'bible-study', 'test', 'supabase'];
-    if (signedInOnly.includes(currentScreen)) setCurrentScreen('login');
+    const signedInOnly: AppScreen[] = ['dashboard', 'student-dashboard', 'servant-dashboard', 'my-readings', 'bible-study', 'ranking', 'test', 'supabase'];
+    // The home page is "Coming Soon" for now, so signed-out visitors start at login.
+    if (signedInOnly.includes(currentScreen) || currentScreen === 'get-started') setCurrentScreen('login');
   }, [sessionReady, currentUser, currentScreen]);
 
   useEffect(() => {
@@ -218,8 +228,7 @@ export default function App() {
     setCurrentUser(user);
     setPreviewRole(null);
     setPreviewProfile(null);
-    // After registration, collect the user's remaining profile details first.
-    setJourneyDestination('profile');
+    setJourneyDestination(authenticatedHomeFor(user));
     setJourneyTransitionUser(user);
   };
 
@@ -263,6 +272,10 @@ export default function App() {
         ? effectiveRole === 'student'
         : effectiveRole === 'teacher' || effectiveRole === 'head';
       if (!allowed) return;
+    }
+    if (screen === 'ranking' && !currentUser) {
+      setCurrentScreen('login');
+      return;
     }
     if (screen === 'profile' && !currentUser) {
       setCurrentScreen('profile');
@@ -377,6 +390,10 @@ export default function App() {
           }} />
         ) : (
           <>
+            {COMING_SOON_SCREENS.includes(currentScreen) && currentUser?.role !== 'test' ? (
+              <ComingSoon theme={theme} />
+            ) : (
+            <>
             {currentScreen === 'get-started' && (
               <GetStartedScreen onNavigate={handleNavigate} currentUser={currentUser} theme={theme} />
             )}
@@ -418,6 +435,11 @@ export default function App() {
             )}
             {currentScreen === 'bible-study' && displayUser && (displayUser.role === 'teacher' || displayUser.role === 'head') && (
               <BibleStudyScreen currentUser={displayUser} theme={theme} simulationMode={simulationMode} />
+            )}
+            </>
+            )}
+            {currentScreen === 'ranking' && displayUser && displayUser.role !== 'test' && (
+              <RankingScreen currentUser={displayUser} theme={theme} simulationMode={simulationMode} />
             )}
           </>
         )}

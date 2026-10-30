@@ -9,7 +9,7 @@ import {
   Moon,
   Sun,
   LogOut,
-  LayoutDashboard,
+  Trophy,
   Database,
   BookOpen,
   BookMarked,
@@ -29,7 +29,8 @@ export type AppScreen =
   | 'supabase'
   | 'test'
   | 'my-readings'
-  | 'bible-study';
+  | 'bible-study'
+  | 'ranking';
 
 interface NavigationTaskbarProps {
   currentScreen: AppScreen;
@@ -79,7 +80,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
 
   const desktopItems: NavigationItem[] = [
     { id: 'get-started', label: 'الرئيسية', icon: Compass },
-    ...(currentUser ? [{ id: 'dashboard' as const, label: 'مشواري', icon: LayoutDashboard }] : []),
+    ...(currentUser ? [{ id: 'ranking' as const, label: 'الترتيب', icon: Trophy }] : []),
     ...readingItem,
     ...(!currentUser
       ? [
@@ -96,7 +97,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
   const mobileItems: NavigationItem[] = currentUser
     ? [
         { id: 'get-started', label: 'الرئيسية', icon: Compass },
-        { id: 'dashboard', label: 'مشواري', icon: LayoutDashboard },
+        { id: 'ranking', label: 'الترتيب', icon: Trophy },
         ...readingItem.map((item) => ({ ...item, label: item.id === 'bible-study' ? 'الكتاب' : item.label })),
         { id: 'profile', label: 'حسابي', icon: UserIcon },
         ...(isHead && !simulationMode ? [{ id: 'supabase' as const, label: 'البيانات', icon: Database }] : []),
