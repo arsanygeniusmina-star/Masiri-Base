@@ -1,0 +1,7 @@
+{
+  "name": "THE APOSTLES",
+  "description": "تطبيق THE APOSTLES لخدمة المرحلة الإعدادية الكنسية - رحلة النمو الروحي والتعليمي للطلاب والخدام",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

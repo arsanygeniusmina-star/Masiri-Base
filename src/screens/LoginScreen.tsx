@@ -1,0 +1,359 @@
+import React, { useState } from 'react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
+import { supabase, fetchUserProfile } from '../lib/supabase';
+import { User } from '../types';
+import { AppScreen } from '../components/NavigationTaskbar';
+import { BrandSpinner, FormLoadingOverlay } from '../components/BrandLoadingSkeleton';
+
+interface LoginScreenProps {
+  onLoginSuccess: (user: User) => void;
+  onNavigate: (screen: AppScreen) => void;
+  theme: 'light' | 'dark';
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLoginSuccess,
+  onNavigate,
+  theme,
+}) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  const handleGoogleSignIn = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsLoading(true);
+    try {
+      window.sessionStorage.setItem('masiri.auth-transition-after-oauth', '1');
+    } catch {
+      // Normal redirect still works when browser storage is restricted.
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      // Supabase redirects the browser on success; keep loading through that redirect.
+    } catch (error) {
+      try {
+        window.sessionStorage.removeItem('masiri.auth-transition-after-oauth');
+      } catch {
+        // Ignore storage restrictions.
+      }
+      console.error('Masiri Google sign-in failed:', error);
+      const detail = error instanceof Error ? error.message : '';
+      setErrorMsg(detail.toLowerCase().includes('provider')
+        ? 'تسجيل الدخول بجوجل غير مُفعّل بعد. يلزم إعداد Google OAuth في لوحة Supabase أولاً.'
+        : detail
+          ? `تعذر بدء تسجيل الدخول بجوجل: ${detail}`
+          : 'تعذر بدء تسجيل الدخول بجوجل. تحقق من الاتصال وحاول مرة أخرى.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setErrorMsg('يرجى إدخال بريد إلكتروني صحيح.');
+      return;
+    }
+    if (!password) {
+      setErrorMsg('يرجى كتابة كلمة السر.');
+      return;
+    }
+
+    setIsLoading(true);
+    let sessionStarted = false;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error || !data.user) {
+        const reason = (error?.message ?? '').toLowerCase();
+        if (reason.includes('email not confirmed')) {
+          setErrorMsg('هذا الحساب أُنشئ قبل تعطيل تأكيد البريد وما زال غير مؤكد. لا تنشئ حساباً آخر بنفس البريد؛ اطلب من أمين الخدمة مراجعة حالة الحساب.');
+        } else if (reason.includes('invalid login credentials')) {
+          setErrorMsg('الإيميل أو كلمة السر غير صحيحين. راجع البيانات، أو استخدم استعادة كلمة السر إذا نسيت كلمة السر.');
+        } else {
+          setErrorMsg(error?.message
+            ? `تعذر تسجيل الدخول: ${error.message}`
+            : 'تعذر تسجيل الدخول. تحقق من الإيميل وكلمة السر ثم حاول مرة أخرى.');
+        }
+        return;
+      }
+
+      if (!data.session) {
+        setErrorMsg('لم تُنشأ جلسة دخول. تحقق من حالة الحساب ثم حاول مرة أخرى.');
+        return;
+      }
+      sessionStarted = true;
+
+      const profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        await supabase.auth.signOut();
+        sessionStarted = false;
+        setErrorMsg('تم التحقق من الحساب لكن ملف المستخدم غير موجود. تواصل مع مسؤول THE APOSTLES لإصلاح ملف الحساب.');
+        return;
+      }
+
+      onLoginSuccess(profile);
+    } catch (error) {
+      console.error('Masiri sign-in failed:', error);
+      if (sessionStarted) {
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.error('Unable to clear incomplete login session:', signOutError);
+        }
+      }
+      setErrorMsg('حدث خطأ أثناء الاتصال بقاعدة البيانات. تحقق من الإنترنت ثم حاول مرة أخرى.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-[88vh] flex items-center justify-center py-10 px-4 sm:px-6 relative overflow-hidden">
+      {/* Super Liquid Glassmorphism Chromatic Background Orbs (Church Burgundy & Warm Gold) */}
+      <div className="absolute top-1/6 -right-24 w-96 h-96 rounded-full bg-[#76243A]/28 dark:bg-[#B65370]/22 blur-3xl pointer-events-none liquid-orb-burgundy" />
+      <div className="absolute bottom-1/6 -left-24 w-96 h-96 rounded-full bg-[#C5A15A]/25 dark:bg-[#D6B878]/18 blur-3xl pointer-events-none liquid-orb-gold" />
+      <div className="absolute top-2/3 right-1/3 w-64 h-64 rounded-full bg-[#76243A]/15 dark:bg-[#B65370]/12 blur-2xl pointer-events-none" />
+
+      {/* Super Liquid Glass Card */}
+      <div
+        className="w-full max-w-md rounded-3xl p-7 sm:p-10 space-y-7 shadow-2xl relative transition-all text-right liquid-glass-card overflow-hidden"
+      >
+        {/* Subtle Brand Loading Overlay during database validation */}
+        {isLoading && (
+          <FormLoadingOverlay
+            theme={theme}
+            message="جاري التحقق من بيانات الدخول مع قاعدة البيانات..."
+          />
+        )}
+        {/* Header: large app logo + title */}
+        <div className="text-center space-y-4">
+          <div
+            className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl mx-auto overflow-hidden shadow-2xl transition-transform hover:scale-105 active:scale-95 border"
+            style={{
+              borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.55)' : 'rgba(118, 36, 58, 0.25)',
+              boxShadow: theme === 'dark'
+                ? '0 16px 40px rgba(0,0,0,0.6), 0 0 35px rgba(214, 184, 120, 0.35)'
+                : '0 16px 36px rgba(118, 36, 58, 0.22), 0 0 25px rgba(214, 184, 120, 0.2)',
+            }}
+          >
+            <img
+              src="/masiri-journey-icon.jpg?v=20261010-2"
+              alt="شعار THE APOSTLES"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <h1
+            dir="ltr"
+            lang="en"
+            className="text-2xl sm:text-3xl uppercase leading-tight"
+            style={{
+              color: theme === 'dark' ? '#F3DEAB' : '#76243A',
+              fontFamily: "'Cinzel', 'Times New Roman', serif",
+              fontWeight: 900,
+              letterSpacing: '0.06em',
+            }}
+          >
+            Welcome Back
+          </h1>
+        </div>
+
+        {successMsg && <div role="status" className="rounded-2xl border p-3.5 text-xs leading-relaxed" style={{ backgroundColor: theme === 'dark' ? 'rgba(32,53,42,.8)' : '#E9F4EC', color: theme === 'dark' ? '#75C695' : '#347653', borderColor: theme === 'dark' ? '#3A3540' : '#B8D7C1' }}>{successMsg}</div>}
+
+        {/* Error notification */}
+        {errorMsg && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="p-3.5 rounded-2xl text-sm flex items-start gap-2 leading-relaxed animate-in fade-in"
+            style={{
+              backgroundColor: theme === 'dark' ? 'rgba(61, 36, 42, 0.75)' : '#F9E9EB',
+              color: theme === 'dark' ? '#F08089' : '#B33B49',
+              border: `1px solid ${theme === 'dark' ? '#69404D' : '#DFC0CA'}`,
+            }}
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleLoginSubmit} className="space-y-4.5">
+          {/* Email input */}
+          <div className="space-y-1.5 text-right">
+            <label
+              htmlFor="email"
+              className="block text-xs font-bold"
+              style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
+            >
+              الإيميل
+            </label>
+            <div className="relative">
+              <input
+                id="email"
+                type="email"
+                required
+                dir="ltr"
+                value={email}
+                disabled={isLoading}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 pl-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
+                style={{
+                  color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                }}
+              />
+              <Mail className="w-4 h-4 text-[#77717A] dark:text-[#B8B1BB] absolute left-3.5 top-3.5 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Password input */}
+          <div className="space-y-1.5 text-right">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="password"
+                className="block text-xs font-bold"
+                style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}
+              >
+                كلمة السر
+              </label>
+            </div>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                dir="ltr"
+                value={password}
+                disabled={isLoading}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pl-11 pr-11 rounded-2xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#76243A] dark:focus:ring-[#B65370] liquid-glass-input"
+                style={{
+                  color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                }}
+              />
+              <Lock className="w-4 h-4 text-[#77717A] dark:text-[#B8B1BB] absolute right-3.5 top-3.5 pointer-events-none" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+                aria-label={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
+                title={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
+                className="absolute left-1 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#77717A] hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] dark:text-[#B8B1BB] dark:hover:bg-white/5"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={async () => {
+              setErrorMsg('');
+              setSuccessMsg('');
+              if (!cleanEmail || !cleanEmail.includes('@')) {
+                setErrorMsg('اكتب بريدك الإلكتروني أولاً لاستعادة كلمة السر.');
+                return;
+              }
+              setIsLoading(true);
+              try {
+                const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+                  redirectTo: `${window.location.origin}/?password-reset=1`,
+                });
+                if (error) {
+                  console.error('Masiri password recovery failed:', error);
+                  setErrorMsg('تعذر إرسال رابط الاستعادة. تحقق من إعدادات الإيميل وحاول لاحقاً.');
+                } else {
+                  setSuccessMsg('إذا كان البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة السر.');
+                }
+              } catch (error) {
+                console.error('Masiri password recovery request failed:', error);
+                setErrorMsg('تعذر الاتصال بخادم الحسابات. تحقق من الإنترنت ثم حاول مرة أخرى.');
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-xl px-3 text-sm font-bold underline underline-offset-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
+            style={{ color: theme === 'dark' ? '#D6B878' : '#76243A' }}
+          >
+            نسيت كلمة السر؟ ابعتلي رابط استعادة
+          </button>
+
+          {/* Submit button with Church Burgundy & Gold in Dark Mode */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3.5 px-5 rounded-2xl text-sm font-bold transition-all hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#76243A] flex items-center justify-center gap-2 shadow-xl mt-4 church-btn-primary"
+            style={{
+              background:
+                theme === 'dark'
+                  ? 'linear-gradient(135deg, #76243A 0%, #541424 100%)'
+                  : 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)',
+              color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF',
+              boxShadow:
+                theme === 'dark'
+                  ? '0 12px 30px rgba(118, 36, 58, 0.6), 0 0 16px rgba(214, 184, 120, 0.2)'
+                  : '0 12px 30px rgba(118, 36, 58, 0.35)',
+              border:
+                theme === 'dark'
+                  ? '1px solid rgba(214, 184, 120, 0.45)'
+                  : '1px solid rgba(255, 255, 255, 0.25)',
+            }}
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2.5">
+                <BrandSpinner size="sm" theme={theme} />
+                <span>جاري تسجيل الدخول والتحقق...</span>
+              </div>
+            ) : (
+              <>
+                <span>يلا ندخل</span>
+                <ArrowRight className="w-4 h-4" style={{ color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF' }} />
+              </>
+            )}
+          </button>
+        </form>
+
+
+        {/* Footer Link to Signup */}
+        <div
+          className="text-center pt-4 border-t text-xs space-y-2"
+          style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
+        >
+          <p style={{ color: theme === 'dark' ? '#B8B1BB' : '#77717A' }}>
+            لسه معندكش حساب في THE APOSTLES؟{' '}
+            <button
+              onClick={() => onNavigate('signup')}
+              className="font-bold underline hover:opacity-85 text-[#76243A] dark:text-[#B65370]"
+            >
+              إنشاء حساب جديد
+            </button>
+          </p>
+
+          <button
+            onClick={() => onNavigate('get-started')}
+            className="text-[11px] text-[#77717A] dark:text-[#B8B1BB] hover:underline block mx-auto pt-1"
+          >
+            ← ارجع للبداية
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

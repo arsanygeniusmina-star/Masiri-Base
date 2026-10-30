@@ -1,0 +1,733 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #76243A;
+    --primary-hover: #5D192D;
+    --primary-soft: #F3E7EB;
+    --primary-border: #DFC0CA;
+    --gold: #C5A15A;
+    --gold-hover: #AF8B45;
+    --gold-soft: #F6F0E3;
+    --background: #F8F7F4;
+    --surface: #FFFFFF;
+    --surface-secondary: #F2F0ED;
+    --surface-hover: #F6F3F1;
+    --text-primary: #272329;
+    --text-secondary: #77717A;
+    --text-muted: #99939A;
+    --border: #E7E2E0;
+    --success: #347653;
+    --success-soft: #E9F4EC;
+    --warning: #A96F19;
+    --warning-soft: #FBF2DE;
+    --error: #B33B49;
+    --error-soft: #F9E9EB;
+    --info: #356D9A;
+
+    --btn-primary-bg: #76243A;
+    --btn-primary-text: #FFFFFF;
+  }
+
+  .dark {
+    --primary: #76243A;
+    --primary-hover: #541424;
+    --primary-soft: #38232C;
+    --primary-border: #69404D;
+    --gold: #D6B878;
+    --gold-hover: #E2C98E;
+    --gold-soft: #342D20;
+    --background: #141217;
+    --surface: #201C24;
+    --surface-secondary: #29242F;
+    --surface-hover: #322C38;
+    --text-primary: #F5F1F0;
+    --text-secondary: #B8B1BB;
+    --text-muted: #89828D;
+    --border: #3A3540;
+    --success: #75C695;
+    --success-soft: #20352A;
+    --warning: #E4B45E;
+    --warning-soft: #392F1D;
+    --error: #F08089;
+    --error-soft: #3D242A;
+    --info: #83B9E5;
+
+    /* In dark mode: Buttons burgundy, text and icons gold! */
+    --btn-primary-bg: #76243A;
+    --btn-primary-text: #F3DEAB;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Scrollbar for refined minimalist church feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* RTL Helpers */
+[dir="rtl"] input,
+[dir="rtl"] textarea {
+  text-align: right;
+}
+
+/* Fluid Liquid Glassmorphism Utilities */
+@keyframes floatOrb1 {
+  0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
+  33% { transform: translate(-35px, -45px) scale(1.15) rotate(15deg); }
+  66% { transform: translate(25px, -20px) scale(0.92) rotate(-10deg); }
+}
+
+@keyframes floatOrb2 {
+  0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
+  33% { transform: translate(40px, 35px) scale(0.88) rotate(-12deg); }
+  66% { transform: translate(-30px, 20px) scale(1.18) rotate(18deg); }
+}
+
+@keyframes floatOrb3 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(20px, -40px) scale(1.1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 15px rgba(214, 184, 120, 0.4)); }
+  50% { opacity: 0.9; filter: drop-shadow(0 0 25px rgba(214, 184, 120, 0.75)); }
+}
+
+@keyframes flameWave {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.1) rotate(4deg); }
+  75% { transform: scale(0.95) rotate(-4deg); }
+}
+
+.liquid-orb-burgundy {
+  animation: floatOrb1 18s ease-in-out infinite;
+}
+
+.liquid-orb-gold {
+  animation: floatOrb2 22s ease-in-out infinite;
+}
+
+.liquid-orb-amber {
+  animation: floatOrb3 15s ease-in-out infinite;
+}
+
+.glow-pulse {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.flame-anim {
+  animation: flameWave 1.8s ease-in-out infinite;
+}
+
+/* Super Liquid Glass Card */
+.liquid-glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 24px 60px -12px rgba(118, 36, 58, 0.12),
+              0 8px 24px -4px rgba(197, 161, 90, 0.1),
+              inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .liquid-glass-card {
+  background: rgba(24, 20, 27, 0.72);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(214, 184, 120, 0.22);
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.75),
+              0 8px 24px -4px rgba(118, 36, 58, 0.35),
+              inset 0 1px 1px rgba(214, 184, 120, 0.28);
+}
+
+.liquid-glass-pill {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 10px 25px -5px rgba(118, 36, 58, 0.08),
+              inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+.dark .liquid-glass-pill {
+  background: rgba(35, 29, 39, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(214, 184, 120, 0.25);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5),
+              inset 0 1px 1px rgba(214, 184, 120, 0.2);
+}
+
+.liquid-glass-input {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(223, 192, 202, 0.6);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.dark .liquid-glass-input {
+  background: rgba(34, 28, 39, 0.6);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(105, 64, 77, 0.5);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* Dedicated Church Button: Burgundy with Gold text in Dark Mode */
+.church-btn-primary,
+.church-btn {
+  background: linear-gradient(135deg, #76243A 0%, #5D192D 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 10px 25px -5px rgba(118, 36, 58, 0.35);
+  transition: all 0.2s ease;
+}
+
+.church-btn-primary svg,
+.church-btn svg {
+  color: #FFFFFF;
+  transition: color 0.2s ease;
+}
+
+/* User requirement: In dark mode, buttons MUST be burgundy and text gold! */
+.dark .church-btn-primary,
+.dark .church-btn,
+.dark .btn-burgundy,
+.dark button.church-btn-primary {
+  background: linear-gradient(135deg, #76243A 0%, #541424 100%) !important;
+  color: #F3DEAB !important;
+  border: 1px solid rgba(214, 184, 120, 0.45) !important;
+  box-shadow: 0 10px 28px -5px rgba(118, 36, 58, 0.65), 0 0 16px rgba(214, 184, 120, 0.2) !important;
+}
+
+.dark .church-btn-primary svg,
+.dark .church-btn svg,
+.dark .btn-burgundy svg,
+.dark button.church-btn-primary svg,
+.dark .church-btn-primary span,
+.dark .church-btn span {
+  color: #F3DEAB !important;
+}
+
+.dark .church-btn-primary:hover,
+.dark .church-btn:hover {
+  background: linear-gradient(135deg, #872942 0%, #5D192D 100%) !important;
+  border-color: rgba(243, 222, 171, 0.65) !important;
+  box-shadow: 0 12px 32px -4px rgba(118, 36, 58, 0.75), 0 0 20px rgba(243, 222, 171, 0.3) !important;
+}
+
+/* Brand Burgundy & Gold Loading Skeletons and Spinners */
+@keyframes brandShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.brand-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(118, 36, 58, 0.08) 0%,
+    rgba(197, 161, 90, 0.18) 50%,
+    rgba(118, 36, 58, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  animation: brandShimmer 1.8s infinite linear;
+}
+
+.dark .brand-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(118, 36, 58, 0.22) 0%,
+    rgba(214, 184, 120, 0.35) 50%,
+    rgba(118, 36, 58, 0.22) 100%
+  );
+  background-size: 200% 100%;
+  animation: brandShimmer 1.8s infinite linear;
+}
+
+@keyframes spinnerRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.brand-spinner {
+  display: inline-block;
+  border-radius: 9999px;
+  animation: spinnerRotate 0.85s linear infinite;
+}
+
+
+
+/* Accessibility: preserve the visual identity while respecting reduced-motion settings. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Avoid content being hidden behind the fixed bottom taskbar on short mobile screens. */
+@media (max-width: 767px) {
+  #root main {
+    min-width: 0;
+    padding-bottom: max(7rem, calc(env(safe-area-inset-bottom) + 6.5rem));
+  }
+}
+
+
+/* Immersive auth success: the journey icon fills the screen, then the pilgrim
+   advances toward the light before revealing the authenticated experience. */
+.journey-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  isolation: isolate;
+  background: #08080b;
+  color: #fff8e9;
+  pointer-events: all;
+  animation: journey-overlay-fade 720ms 3.58s ease-in forwards;
+}
+
+.journey-transition__scene {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100vw, 100vh);
+  height: max(100vw, 100vh);
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  transform: translate(-50%, -50%) scale(0.22);
+  border-radius: 2rem;
+  filter: brightness(0.98) saturate(1.04);
+  box-shadow: 0 0 90px rgba(255, 190, 75, 0.22);
+  will-change: transform, filter, border-radius;
+  animation: journey-scene-expand 1250ms cubic-bezier(0.18, 0.8, 0.2, 1) forwards;
+}
+
+.journey-transition__vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 22%, rgba(255, 195, 86, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(5, 4, 8, 0.08) 0%, transparent 45%, rgba(3, 3, 7, 0.76) 100%);
+  opacity: 0;
+  animation: journey-vignette-reveal 800ms 1.05s ease-out forwards;
+}
+
+.journey-transition__cross-glow {
+  position: absolute;
+  top: 8vh;
+  left: 50%;
+  width: clamp(10rem, 27vw, 23rem);
+  aspect-ratio: 1;
+  transform: translateX(-50%) scale(0.45);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 246, 205, 0.56) 0%, rgba(255, 185, 62, 0.24) 30%, rgba(255, 172, 52, 0.07) 54%, transparent 72%);
+  opacity: 0;
+  filter: blur(4px);
+  animation: journey-cross-awaken 1050ms 2.5s ease-out forwards;
+}
+
+.journey-transition__light {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  width: 1.1rem;
+  height: 1.1rem;
+  transform: translate(-50%, -50%) scale(0.35);
+  border-radius: 50%;
+  background: #fff9d8;
+  box-shadow: 0 0 12px 7px rgba(255, 233, 157, 0.65), 0 0 45px 21px rgba(255, 188, 65, 0.45);
+  opacity: 0;
+  animation: journey-light-shares 1s 2.58s cubic-bezier(0.2, 0.7, 0.25, 1) forwards;
+}
+
+.journey-transition__walker {
+  position: absolute;
+  left: 50%;
+  bottom: 27vh;
+  width: 5.25rem;
+  height: 12.25rem;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 6px 7px rgba(0, 0, 0, 0.7));
+  transform-origin: center bottom;
+  will-change: transform, filter;
+  animation: journey-walk-forward 2.7s 780ms cubic-bezier(0.2, 0.72, 0.18, 1) forwards;
+}
+
+.journey-walker__head {
+  position: absolute;
+  z-index: 2;
+  top: 0.05rem;
+  left: 1.75rem;
+  width: 1.75rem;
+  height: 2rem;
+  background: #08080b;
+  border-radius: 48% 48% 43% 43%;
+  box-shadow: inset 0.22rem 0.2rem 0 rgba(57, 46, 30, 0.8);
+}
+
+.journey-walker__head::before {
+  content: "";
+  position: absolute;
+  left: 0.08rem;
+  top: -0.2rem;
+  width: 1.28rem;
+  height: 0.54rem;
+  border-radius: 70% 40% 0 0;
+  background: #08080b;
+  transform: rotate(-8deg);
+}
+
+.journey-walker__neck {
+  position: absolute;
+  top: 1.65rem;
+  left: 2.3rem;
+  width: 0.72rem;
+  height: 0.66rem;
+  background: #08080b;
+}
+
+.journey-walker__body {
+  position: absolute;
+  z-index: 2;
+  top: 2rem;
+  left: 1.12rem;
+  width: 3rem;
+  height: 4.25rem;
+  background: linear-gradient(90deg, #08080b 0%, #111016 54%, #07070a 100%);
+  clip-path: polygon(26% 0, 75% 0, 98% 19%, 90% 82%, 83% 100%, 17% 100%, 10% 82%, 2% 19%);
+}
+
+.journey-walker__backpack {
+  position: absolute;
+  z-index: 3;
+  top: 2.82rem;
+  left: 1.5rem;
+  width: 2.22rem;
+  height: 3.2rem;
+  border: 2px solid rgba(94, 76, 49, 0.72);
+  border-radius: 0.8rem 0.8rem 0.6rem 0.6rem;
+  background: linear-gradient(90deg, #0b0a0e, #141219 48%, #08080b);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.journey-walker__backpack::after {
+  content: "";
+  position: absolute;
+  top: 0.35rem;
+  left: 0.2rem;
+  right: 0.2rem;
+  height: 1.45rem;
+  border: 1px solid rgba(107, 89, 59, 0.36);
+  border-radius: 0.4rem;
+}
+
+.journey-walker__arm {
+  position: absolute;
+  z-index: 1;
+  top: 2.38rem;
+  width: 0.92rem;
+  height: 3.75rem;
+  border-radius: 0.6rem;
+  background: linear-gradient(90deg, #08080b, #141219);
+  transform-origin: top center;
+}
+
+.journey-walker__arm--left { left: 0.72rem; animation: journey-arm-left 410ms 1.1s ease-in-out 5; }
+.journey-walker__arm--right { right: 0.72rem; animation: journey-arm-right 410ms 1.1s ease-in-out 5; }
+
+.journey-walker__leg {
+  position: absolute;
+  z-index: 1;
+  top: 5.72rem;
+  width: 1.02rem;
+  height: 5.35rem;
+  border-radius: 0.35rem 0.35rem 0.58rem 0.58rem;
+  background: linear-gradient(90deg, #08080b, #121117 58%, #07070a);
+  transform-origin: top center;
+}
+
+.journey-walker__leg--left { left: 1.5rem; animation: journey-leg-left 410ms 1.1s ease-in-out 5; }
+.journey-walker__leg--right { right: 1.5rem; animation: journey-leg-right 410ms 1.1s ease-in-out 5; }
+
+.journey-walker__foot {
+  position: absolute;
+  z-index: 2;
+  bottom: 0;
+  width: 1.45rem;
+  height: 0.58rem;
+  background: #060609;
+  border-radius: 0.4rem 0.5rem 0.22rem 0.22rem;
+}
+.journey-walker__foot--left { left: 1.28rem; }
+.journey-walker__foot--right { right: 1.1rem; }
+
+.journey-transition__caption {
+  position: absolute;
+  z-index: 8;
+  inset-inline: 1rem;
+  bottom: max(2.2rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.32rem;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(0.6rem);
+  animation: journey-caption-show 800ms 1.1s ease-out forwards, journey-caption-hide 500ms 3.2s ease-in forwards;
+}
+
+.journey-transition__caption-title {
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  line-height: 1.15;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff3c7;
+  text-shadow: 0 0 25px rgba(255, 188, 65, 0.45);
+}
+
+.journey-transition__caption-subtitle {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: rgba(255, 248, 233, 0.82);
+}
+
+.journey-transition__flare {
+  position: absolute;
+  z-index: 9;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 16%, rgba(255, 249, 223, 0.92), rgba(255, 209, 117, 0.42) 23%, transparent 63%);
+  opacity: 0;
+  pointer-events: none;
+  animation: journey-cross-flare 720ms 3.08s ease-out forwards;
+}
+
+@keyframes journey-scene-expand {
+  0% { transform: translate(-50%, -50%) scale(0.22); border-radius: 2rem; filter: brightness(0.98) saturate(1.04); }
+  72% { transform: translate(-50%, -50%) scale(1.03); border-radius: 0.65rem; filter: brightness(0.88) saturate(1.06); }
+  100% { transform: translate(-50%, -50%) scale(1.13); border-radius: 0; filter: brightness(0.72) saturate(1.1); }
+}
+@keyframes journey-vignette-reveal { to { opacity: 1; } }
+@keyframes journey-cross-awaken {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.45); }
+  40% { opacity: 0.95; transform: translateX(-50%) scale(1.18); }
+  100% { opacity: 0.48; transform: translateX(-50%) scale(1); }
+}
+@keyframes journey-light-shares {
+  0% { opacity: 0; top: 18%; transform: translate(-50%, -50%) scale(0.35); }
+  20% { opacity: 1; }
+  78% { opacity: 0.92; top: 47%; transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 0; top: 47%; transform: translate(-50%, -50%) scale(1.45); }
+}
+@keyframes journey-walk-forward {
+  0% { transform: translate(-50%, 0) scale(1); filter: drop-shadow(0 6px 7px rgba(0, 0, 0, 0.7)); }
+  12% { transform: translate(-50%, -1.2vh) scale(0.98); }
+  100% { transform: translate(-50%, -60vh) scale(0.4); filter: drop-shadow(0 0 22px rgba(255, 199, 83, 0.88)); }
+}
+@keyframes journey-leg-left { 0%, 100% { transform: rotate(10deg); } 50% { transform: rotate(-13deg); } }
+@keyframes journey-leg-right { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(13deg); } }
+@keyframes journey-arm-left { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(12deg); } }
+@keyframes journey-arm-right { 0%, 100% { transform: rotate(8deg); } 50% { transform: rotate(-12deg); } }
+@keyframes journey-caption-show { to { opacity: 1; transform: translateY(0); } }
+@keyframes journey-caption-hide { to { opacity: 0; transform: translateY(-0.35rem); } }
+@keyframes journey-cross-flare { 0% { opacity: 0; } 26% { opacity: 0.7; } 100% { opacity: 0; } }
+@keyframes journey-overlay-fade { to { opacity: 0; visibility: hidden; } }
+
+@media (max-aspect-ratio: 4/5) {
+  .journey-transition__cross-glow { top: 18vh; }
+  .journey-transition__walker {
+    bottom: 18vh;
+    height: 13rem;
+    animation-name: journey-walk-forward-mobile;
+  }
+  @keyframes journey-walk-forward-mobile {
+    0% { transform: translate(-50%, 0) scale(1); }
+    12% { transform: translate(-50%, -1vh) scale(0.98); }
+    100% { transform: translate(-50%, -40vh) scale(0.44); filter: drop-shadow(0 0 22px rgba(255, 199, 83, 0.88)); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-transition,
+  .journey-transition *,
+  .journey-transition *::before,
+  .journey-transition *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* Compact post-auth confirmation: zoom into the existing pilgrim/path/cross artwork,
+   then draw a gold checkmark along the path instead of replaying the long walking scene. */
+.auth-success-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff8e9;
+  background: #100c12;
+  pointer-events: all;
+  animation: auth-success-dismiss 220ms ease-in 1.53s forwards;
+}
+.auth-success-transition--light,
+.auth-success-transition--dark {
+  background: radial-gradient(ellipse at 50% 45%, #38232c 0%, #171117 67%, #100c12 100%);
+}
+.auth-success-transition__backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 47%, rgba(214,184,120,.19) 0%, rgba(118,36,58,.12) 35%, transparent 68%);
+  opacity: 0;
+  animation: auth-success-backdrop 500ms 90ms ease-out forwards;
+}
+.auth-success-transition__scene {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  width: min(84vw, 68vh, 34rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: clamp(1.2rem, 4vw, 2rem);
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(214,184,120,.3);
+  box-shadow: 0 18px 70px rgba(0,0,0,.35), 0 0 50px rgba(214,184,120,.12);
+  transform: translate(-50%, -50%) scale(.58);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: auth-success-zoom 1.42s cubic-bezier(.18,.78,.16,1) forwards;
+}
+.auth-success-transition__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+}
+.auth-success-transition__checkmark {
+  position: absolute;
+  top: 63%;
+  left: 54%;
+  display: grid;
+  place-items: center;
+  width: clamp(3rem, 8vw, 4.25rem);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255,243,199,.92);
+  border-radius: 50%;
+  background: rgba(18,14,21,.9);
+  box-shadow: 0 0 0 5px rgba(214,184,120,.12), 0 0 30px rgba(214,184,120,.5);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.38);
+  animation: auth-success-check-pop 390ms 820ms cubic-bezier(.18,.86,.24,1.2) forwards;
+}
+.auth-success-transition__checkmark svg {
+  width: 65%;
+  height: 65%;
+  overflow: visible;
+}
+.auth-success-transition__check-path {
+  fill: none;
+  stroke: #F3DEAB;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 42;
+  stroke-dashoffset: 42;
+  animation: auth-success-check-draw 260ms 1s ease-out forwards;
+}
+.auth-success-transition__caption {
+  position: absolute;
+  inset-inline: 1rem;
+  bottom: max(2.2rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .32rem;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(.5rem);
+  animation: auth-success-caption 270ms 1.08s ease-out forwards;
+}
+.auth-success-transition__caption-title {
+  font-size: clamp(1.2rem, 3.5vw, 1.6rem);
+  line-height: 1.25;
+  font-weight: 900;
+  color: #F3DEAB;
+  text-shadow: 0 0 20px rgba(214,184,120,.22);
+}
+.auth-success-transition__caption-subtitle {
+  font-size: .9rem;
+  line-height: 1.4;
+  font-weight: 650;
+  color: rgba(255,248,233,.82);
+}
+@keyframes auth-success-backdrop { to { opacity: 1; } }
+@keyframes auth-success-zoom {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.58); }
+  22% { opacity: 1; }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}
+@keyframes auth-success-check-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.38); }
+  72% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes auth-success-check-draw { to { stroke-dashoffset: 0; } }
+@keyframes auth-success-caption {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes auth-success-dismiss { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .auth-success-transition,
+  .auth-success-transition *,
+  .auth-success-transition *::before,
+  .auth-success-transition *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
