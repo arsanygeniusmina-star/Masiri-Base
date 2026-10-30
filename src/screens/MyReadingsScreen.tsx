@@ -113,7 +113,9 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
         fetchReadingAnswers({ studentId: currentUser.id }),
         fetchReadingStreaks([currentUser.id], today),
       ]);
-      setAssignments(visible);
+      // Servants and head servants follow only the daily plan (readings sent to everyone);
+      // they can also see readings they manage, which are not theirs to complete.
+      setAssignments(currentUser.role === 'student' ? visible : visible.filter((item) => item.targetType === 'all' && item.status === 'published'));
       setCompletions(ownCompletions);
       setAnswers(ownAnswers);
       setStreak(streaks[0] ?? computeReadingStreak(currentUser.id, ownCompletions.map(creditedDateOf), today));
@@ -122,7 +124,7 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
     } finally {
       setLoading(false);
     }
-  }, [simulationMode, localPreview, currentUser.id, currentUser.gradeLevel, today]);
+  }, [simulationMode, localPreview, currentUser.id, currentUser.role, currentUser.gradeLevel, today]);
 
   useEffect(() => {
     void load();
@@ -474,7 +476,7 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
                     <span className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs" style={{ backgroundColor: p.primary, color: '#F3DEAB' }}>{needsAnswer ? '٢' : '١'}</span>
                     صورة بعد القراءة
                   </p>
-                  <p className="text-xs" style={{ color: p.muted }}>التقط أي صورة بكاميرا الموبايل بعد ما تخلّص القراءة — مثلًا الإنجيل المفتوح أو كراسة التأمل. الصورة يراها خادم فصلك فقط.</p>
+                  <p className="text-xs" style={{ color: p.muted }}>التقط أي صورة بكاميرا الموبايل بعد ما تخلّص القراءة — مثلًا الإنجيل المفتوح أو كراسة التأمل. الصورة هتتنشر في «الرئيسية» ويشوفها الكل.</p>
                   {photoPreview ? (
                     <div className="flex flex-wrap items-center gap-3">
                       <img src={photoPreview} alt="الصورة الملتقطة" className="h-28 w-28 rounded-2xl object-cover shadow-md" />

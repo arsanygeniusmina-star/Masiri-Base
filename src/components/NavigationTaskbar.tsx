@@ -69,10 +69,14 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
   const isTest = currentUser?.role === 'test';
   const isStudent = currentUser?.role === 'student';
   const isServant = isHead || isTeacher;
+  // Everyone (students and servants) reads «إصحاح النهارده»; servants also manage the Bible readings.
   const readingItem: NavigationItem[] = isStudent
     ? [{ id: 'my-readings', label: 'إصحاح النهارده', icon: BookMarked }]
     : isServant
-    ? [{ id: 'bible-study', label: 'الكتاب المقدس', icon: BookOpen }]
+    ? [
+        { id: 'my-readings', label: 'إصحاح النهارده', icon: BookMarked },
+        { id: 'bible-study', label: 'الكتاب المقدس', icon: BookOpen },
+      ]
     : [];
   const isDashboard = currentScreen === 'dashboard' ||
     currentScreen === 'student-dashboard' ||
