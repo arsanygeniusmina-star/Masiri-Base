@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { User, MiddleSchoolGrade, TeacherWhitelistEntry, ManagedRoleAccount, ManagedStudent } from '../types';
 import { supabase, mapUserProfile } from '../lib/supabase';
 import {
@@ -30,6 +31,164 @@ import { AppScreen } from '../components/NavigationTaskbar';
 import { StreakBadge } from '../components/readings/StreakBadge';
 import { useReadingStreak } from '../lib/useReadingStreak';
 import { CameraCapture } from '../components/readings/CameraCapture';
+
+// ============================================================
+// Memoized card components (prevents list re-render lag)
+// ============================================================
+
+const StudentCard = memo(({ student, theme, isHead, deletingStudentId, onDelete }: {
+  student: ManagedStudent;
+  theme: 'light' | 'dark';
+  isHead: boolean;
+  deletingStudentId: string | null;
+  onDelete: (student: ManagedStudent) => void;
+}) => {
+  const gradeLabel = student.gradeLevel === 'grade-1'
+    ? 'الصف السابع'
+    : student.gradeLevel === 'grade-2'
+      ? 'الصف الثامن'
+      : student.gradeLevel === 'grade-3'
+        ? 'الصف التاسع'
+        : 'بدون صف';
+
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all"
+      style={{
+        backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
+        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      }}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs shrink-0 overflow-hidden"
+          style={{
+            backgroundColor: theme === 'dark' ? '#20352A' : '#E9F4EC',
+            color: theme === 'dark' ? '#75C695' : '#347653',
+          }}
+        >
+          {student.avatarUrl ? (
+            <img src={student.avatarUrl} alt={student.name} className="w-full h-full object-cover" />
+          ) : (
+            student.name.charAt(0) || 'ط'
+          )}
+        </div>
+        <div className="text-right min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-bold text-xs sm:text-sm truncate" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+              {student.name}
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
+              {gradeLabel}
+            </span>
+          </div>
+          <p className="text-[11px] text-[#77717A] dark:text-[#B8B1BB] font-mono truncate" dir="ltr">
+            {student.email}
+          </p>
+          <div className="flex items-center gap-3 text-[10px] text-[#77717A] dark:text-[#B8B1BB] mt-0.5">
+            <span className="flex items-center gap-1">
+              <Award className="w-3 h-3 text-[#C5A15A]" />
+              {student.points} نقطة
+            </span>
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-[#C5A15A]" />
+              {student.streakDays} يوم متتالي
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {isHead && (
+        <button
+          onClick={() => onDelete(student)}
+          disabled={deletingStudentId === student.id}
+          title={`حذف الطالب ${student.name}`}
+          className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50 shrink-0 min-w-[44px] min-h-[44px]"
+          style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
+        >
+          {deletingStudentId === student.id ? <span className="animate-spin inline-block">⏳</span> : <Trash2 className="w-4 h-4" />}
+        </button>
+      )}
+    </motion.div>
+  );
+});
+
+StudentCard.displayName = 'StudentCard';
+
+const TeacherCard = memo(({ item, theme, isHead, onDelete }: {
+  item: { id: string; name: string; email: string; assignedGrade?: MiddleSchoolGrade | null; role?: 'teacher' | 'head' | 'test'; status?: string };
+  theme: 'light' | 'dark';
+  isHead: boolean;
+  onDelete: (id: string | undefined, name: string) => void;
+}) => {
+  const isTeacherItem = !item.role || item.role === 'teacher';
+  const gradeText = item.assignedGrade === 'grade-1' ? 'الصف السابع' : item.assignedGrade === 'grade-2' ? 'الصف الثامن' : item.assignedGrade === 'grade-3' ? 'الصف التاسع' : '';
+
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all"
+      style={{
+        backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
+        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      }}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
+          style={{
+            backgroundColor: item.role === 'head'
+              ? (theme === 'dark' ? '#38232C' : '#F3E7EB')
+              : (theme === 'dark' ? '#342D20' : '#F6F0E3'),
+            color: item.role === 'head'
+              ? (theme === 'dark' ? '#B65370' : '#76243A')
+              : (theme === 'dark' ? '#D6B878' : '#A96F19'),
+          }}
+        >
+          {item.role === 'head' ? 'أم' : item.role === 'test' ? 'تج' : 'خـ'}
+        </div>
+        <div className="text-right min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+              {item.name}
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
+              {item.role === 'head' ? 'أمين خدمة' : item.role === 'test' ? 'اختبار' : 'خادم'}
+            </span>
+          </div>
+          <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono break-all truncate" dir="ltr">
+            {item.email}
+            {gradeText && ` · ${gradeText}`}
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={() => onDelete(item.id, item.name)}
+        title={`إلغاء اعتماد ${item.name}`}
+        className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 min-w-[44px] min-h-[44px]"
+        style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </motion.div>
+  );
+});
+
+TeacherCard.displayName = 'TeacherCard';
+
+// Simple debounce hook
+function useDebounce(value: string, delay: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
 
 interface ProfileScreenProps {
   currentUser: User | null;
@@ -610,14 +769,21 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
     }
   };
 
-  const filteredStudents = studentsList.filter((student) => {
-    const query = studentSearch.trim().toLowerCase();
+  const debouncedStudentSearch = useDebounce(studentSearch, 150);
+
+  const filteredStudents = useMemo(() => studentsList.filter((student) => {
+    const query = debouncedStudentSearch.trim().toLowerCase();
     if (!query) return true;
     return student.name.toLowerCase().includes(query) || student.email.toLowerCase().includes(query);
-  });
+  }), [studentsList, debouncedStudentSearch]);
 
   return (
-    <div className="max-w-6xl mx-auto py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 relative overflow-x-clip">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="max-w-6xl mx-auto py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 relative overflow-x-clip"
+    >
       {/* Background Ambient Glow */}
       <div className="absolute top-10 right-0 sm:right-10 w-64 sm:w-96 h-64 sm:h-96 rounded-full bg-[#76243A]/15 dark:bg-[#B65370]/15 blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-0 sm:left-10 w-64 sm:w-96 h-64 sm:h-96 rounded-full bg-[#C5A15A]/15 dark:bg-[#D6B878]/10 blur-3xl pointer-events-none" />
@@ -1387,100 +1553,115 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
 
                   <div className="space-y-2.5">
                     {/* Teachers */}
-                    {teachersList.map((teacher) => (
-                      <div
-                        key={`teacher-${teacher.id}`}
-                        className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all hover:scale-[1.01]"
-                        style={{
-                          backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
-                          borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                        }}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
-                            style={{
-                              backgroundColor: theme === 'dark' ? '#342D20' : '#F6F0E3',
-                              color: theme === 'dark' ? '#D6B878' : '#A96F19',
-                            }}
-                          >
-                            خـ
-                          </div>
-                          <div className="text-right min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                                {teacher.name}
-                              </span>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
-                                خادم
-                              </span>
-                            </div>
-                            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono break-all" dir="ltr">
-                              {teacher.email}
-                              {teacher.assignedGrade && ` · ${teacher.assignedGrade === 'grade-1' ? 'الصف السابع' : teacher.assignedGrade === 'grade-2' ? 'الصف الثامن' : 'الصف التاسع'}`}
-                            </p>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => handleRemoveTeacher(teacher.id, teacher.name)}
-                          title="إلغاء اعتماد الخادم"
-                          className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                          style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
+                    <AnimatePresence mode="wait">
+                      {teachersList.map((teacher) => (
+                        <motion.div
+                          key={`teacher-${teacher.id}`}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.3 }}
+                          whileHover={{ y: -2 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="p-3.5 rounded-2xl border flex items-center justify-between gap-3"
+                          style={{
+                            backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
+                            borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                          }}
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
+                              style={{
+                                backgroundColor: theme === 'dark' ? '#342D20' : '#F6F0E3',
+                                color: theme === 'dark' ? '#D6B878' : '#A96F19',
+                              }}
+                            >
+                              خـ
+                            </div>
+                            <div className="text-right min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+                                  {teacher.name}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
+                                  خادم
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono break-all" dir="ltr">
+                                {teacher.email}
+                                {teacher.assignedGrade && ` · ${teacher.assignedGrade === 'grade-1' ? 'الصف السابع' : teacher.assignedGrade === 'grade-2' ? 'الصف الثامن' : 'الصف التاسع'}`}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleRemoveTeacher(teacher.id, teacher.name)}
+                            title="إلغاء اعتماد الخادم"
+                            className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 min-w-[44px] min-h-[44px]"
+                            style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
 
                     {/* Heads & Test Accounts */}
-                    {roleAccounts.map((acc) => (
-                      <div
-                        key={`role-${acc.email}`}
-                        className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all hover:scale-[1.01]"
-                        style={{
-                          backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
-                          borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                        }}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
-                            style={{
-                              backgroundColor: acc.role === 'head'
-                                ? (theme === 'dark' ? '#38232C' : '#F3E7EB')
-                                : (theme === 'dark' ? '#2D2335' : '#F0E8F5'),
-                              color: acc.role === 'head'
-                                ? (theme === 'dark' ? '#B65370' : '#76243A')
-                                : (theme === 'dark' ? '#A855F7' : '#7C3AED'),
-                            }}
-                          >
-                            {acc.role === 'head' ? 'أم' : acc.role === 'test' ? 'تج' : 'خـ'}
-                          </div>
-                          <div className="text-right min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                                {acc.name || acc.email}
-                              </span>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                                style={{
-                                  backgroundColor: acc.role === 'head'
-                                    ? 'rgba(182, 83, 112, 0.1)'
-                                    : acc.role === 'test'
-                                      ? 'rgba(168, 85, 247, 0.1)'
-                                      : 'rgba(34, 197, 94, 0.1)',
-                                  color: acc.role === 'head'
-                                    ? (theme === 'dark' ? '#B65370' : '#76243A')
-                                    : acc.role === 'test'
-                                      ? (theme === 'dark' ? '#A855F7' : '#7C3AED')
-                                      : (theme === 'dark' ? '#75C695' : '#347653'),
-                                }}
-                              >
-                                {acc.role === 'head' ? 'أمين خدمة' : acc.role === 'test' ? 'اختبار' : 'خادم'}
-                              </span>
+                    <AnimatePresence mode="wait">
+                      {roleAccounts.map((acc) => (
+                        <motion.div
+                          key={`role-${acc.email}`}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.3 }}
+                          whileHover={{ y: -2 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="p-3.5 rounded-2xl border flex items-center justify-between gap-3"
+                          style={{
+                            backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
+                            borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                          }}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shadow-xs"
+                              style={{
+                                backgroundColor: acc.role === 'head'
+                                  ? (theme === 'dark' ? '#38232C' : '#F3E7EB')
+                                  : (theme === 'dark' ? '#2D2335' : '#F0E8F5'),
+                                color: acc.role === 'head'
+                                  ? (theme === 'dark' ? '#B65370' : '#76243A')
+                                  : (theme === 'dark' ? '#A855F7' : '#7C3AED'),
+                              }}
+                            >
+                              {acc.role === 'head' ? 'أم' : acc.role === 'test' ? 'تج' : 'خـ'}
                             </div>
-                            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono break-all" dir="ltr">
-                              {acc.email}
+                            <div className="text-right min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs sm:text-sm" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+                                  {acc.name || acc.email}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                                  style={{
+                                    backgroundColor: acc.role === 'head'
+                                      ? 'rgba(182, 83, 112, 0.1)'
+                                      : acc.role === 'test'
+                                        ? 'rgba(168, 85, 247, 0.1)'
+                                        : 'rgba(34, 197, 94, 0.1)',
+                                    color: acc.role === 'head'
+                                      ? (theme === 'dark' ? '#B65370' : '#76243A')
+                                      : acc.role === 'test'
+                                        ? (theme === 'dark' ? '#A855F7' : '#7C3AED')
+                                        : (theme === 'dark' ? '#75C695' : '#347653'),
+                                  }}
+                                >
+                                  {acc.role === 'head' ? 'أمين خدمة' : acc.role === 'test' ? 'اختبار' : 'خادم'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#77717A] dark:text-[#B8B1BB] font-mono break-all" dir="ltr">
+                                {acc.email}
                             </p>
                           </div>
                         </div>
@@ -1493,8 +1674,9 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                      </div>
-                    ))}
+                      </motion.div>
+                      ))}
+                    </AnimatePresence>
                   </div>
                 </div>
               </div>
@@ -1575,73 +1757,18 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filteredStudents.map((student) => (
-                  <div
-                    key={student.id}
-                    className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all hover:scale-[1.01]"
-                    style={{
-                      backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
-                      borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                    }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs shrink-0 overflow-hidden"
-                        style={{
-                          backgroundColor: theme === 'dark' ? '#20352A' : '#E9F4EC',
-                          color: theme === 'dark' ? '#75C695' : '#347653',
-                        }}
-                      >
-                        {student.avatarUrl ? (
-                          <img src={student.avatarUrl} alt={student.name} className="w-full h-full object-cover" />
-                        ) : (
-                          student.name.charAt(0) || 'ط'
-                        )}
-                      </div>
-                      <div className="text-right min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-bold text-xs sm:text-sm truncate" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
-                            {student.name}
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
-                            {student.gradeLevel === 'grade-1'
-                              ? 'الصف السابع'
-                              : student.gradeLevel === 'grade-2'
-                                ? 'الصف الثامن'
-                                : student.gradeLevel === 'grade-3'
-                                  ? 'الصف التاسع'
-                                  : 'بدون صف'}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-[#77717A] dark:text-[#B8B1BB] font-mono truncate" dir="ltr">
-                          {student.email}
-                        </p>
-                        <div className="flex items-center gap-3 text-[10px] text-[#77717A] dark:text-[#B8B1BB] mt-0.5">
-                          <span className="flex items-center gap-1">
-                            <Award className="w-3 h-3 text-[#C5A15A]" />
-                            {student.points} نقطة
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-[#C5A15A]" />
-                            {student.streakDays} يوم متتالي
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {isHead && (
-                      <button
-                        onClick={() => handleDeleteStudent(student)}
-                        disabled={deletingStudentId === student.id}
-                        title={`حذف الطالب ${student.name}`}
-                        className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50 shrink-0"
-                        style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
-                      >
-                        {deletingStudentId === student.id ? <span className="animate-spin inline-block">⏳</span> : <Trash2 className="w-4 h-4" />}
-                      </button>
-                    )}
-                  </div>
-                ))}
+                <AnimatePresence mode="wait">
+                  {filteredStudents.map((student) => (
+                    <StudentCard
+                      key={student.id}
+                      student={student}
+                      theme={theme}
+                      isHead={isHead}
+                      deletingStudentId={deletingStudentId}
+                      onDelete={handleDeleteStudent}
+                    />
+                  ))}
+                </AnimatePresence>
               </div>
             )}
 
@@ -1846,6 +1973,6 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
           onClose={() => setAvatarCameraOpen(false)}
         />
       )}
-    </div>
+    </motion.div>
   );
 };
