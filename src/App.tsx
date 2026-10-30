@@ -34,7 +34,7 @@ const authenticatedHomeFor = (user: User): AppScreen =>
  * Pages that are not open yet: they show only the blurred background with
  * "Coming Soon". Remove a screen from this list to open it again.
  */
-const COMING_SOON_SCREENS: AppScreen[] = ['get-started', 'profile', 'dashboard', 'student-dashboard', 'servant-dashboard'];
+const COMING_SOON_SCREENS: AppScreen[] = ['get-started', 'dashboard', 'student-dashboard', 'servant-dashboard'];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -409,6 +409,7 @@ export default function App() {
                 currentUser={displayUser}
                 onUpdateCurrentUser={handleUpdateCurrentUser}
                 onNavigate={handleNavigate}
+                onLogout={handleLogout}
                 theme={theme}
                 simulationMode={simulationMode}
               />

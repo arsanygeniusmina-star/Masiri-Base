@@ -33,6 +33,7 @@ interface ProfileScreenProps {
   currentUser: User | null;
   onUpdateCurrentUser: (updated: User) => void;
   onNavigate: (screen: AppScreen) => void;
+  onLogout?: () => void;
   theme: 'light' | 'dark';
   simulationMode?: boolean;
 }
@@ -85,6 +86,7 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
   currentUser,
   onUpdateCurrentUser,
   onNavigate,
+  onLogout,
   theme,
   simulationMode = false,
 }) => {
@@ -123,6 +125,11 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarCameraOpen, setAvatarCameraOpen] = useState(false);
   const [avatarError, setAvatarError] = useState('');
+
+  // Password reset state
+  const [resetSending, setResetSending] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -312,6 +319,31 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
     }
   };
 
+  // Send a password reset link to the signed-in account's email.
+  const handleSendPasswordReset = async () => {
+    setResetFeedback(null);
+    setResetSending(true);
+
+    if (simulationMode) {
+      setResetSending(false);
+      setResetFeedback({ type: 'success', message: 'في وضع المحاكاة فقط: كان سيتم إرسال رابط إعادة تعيين كلمة السر.' });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(currentUser.email, {
+        redirectTo: `${window.location.origin}/?password-reset=1`,
+      });
+      if (error) throw error;
+      setResetFeedback({ type: 'success', message: `تم إرسال رابط إعادة تعيين كلمة السر إلى ${currentUser.email}. راجع بريدك.` });
+    } catch (error) {
+      console.error('Password reset failed:', error);
+      setResetFeedback({ type: 'error', message: 'تعذر إرسال رابط إعادة التعيين. حاول مرة أخرى.' });
+    } finally {
+      setResetSending(false);
+    }
+  };
+
   // Only the authenticated head account can manage this server-side whitelist.
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -480,10 +512,10 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
     }
 
     // Also reset user role to student if they have a profile
-    await supabase.from('users').update({ role: 'student', grade_level: null }).eq('email', email);
+    await supabase.from('users').update({ role: 'student', grade_level: null }).eq('email', foundEmail);
 
     setTeachersList((previous) => previous.filter((teacher) => teacher.id !== id));
-    setRoleAccounts((previous) => previous.filter((acc) => acc.id !== id));
+    setRoleAccounts((previous) => previous.filter((acc) => acc.email !== foundEmail));
     setWhitelistFeedback({ type: 'success', message: `تم إلغاء اعتماد ${teacherName} من قاعدة البيانات.` });
   };
 
@@ -510,16 +542,16 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                   : 'linear-gradient(135deg, #347653 0%, #20352A 100%)',
               }}
             >
-              {isHead ? (
-                <img
-                  src="/logo.jpg"
-                  alt="شعار الخدمة"
-                  className="w-full h-full object-cover"
-                />
-              ) : avatarUrl ? (
+              {avatarUrl ? (
                 <img
                   src={avatarUrl}
                   alt={`صورة ${currentUser.name}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : isHead ? (
+                <img
+                  src="/logo.jpg"
+                  alt="شعار الخدمة"
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -527,7 +559,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               )}
             </div>
             {/* Camera button for avatar upload */}
-            {!isHead && !simulationMode && (
+            {!simulationMode && (
               <button
                 type="button"
                 onClick={() => setAvatarCameraOpen(true)}
@@ -937,7 +969,7 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                     }}
                   >
                     <span className="font-bold block mb-1">تنبيه الصلاحية:</span>
-                    لا يمكنك إضافة معلمين آخرين؛ هذه الصلاحية قاصرة على أمين الخدمة العام (minasamehdeif@gmail.com).
+                    لا يمكنك إضافة معلمين آخرين؛ هذه الصلاحية قاصرة على أمين الخدمة العام.
                   </div>
                 </div>
               ) : (
@@ -961,6 +993,79 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                     <span>نقاط التميز الروحي: {currentUser.points} نقطة</span>
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* Account Security Card */}
+            <div
+              className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right liquid-glass-card backdrop-blur-3xl"
+              style={{
+                borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+              }}
+            >
+              <h3 className="text-sm font-bold flex items-center gap-1.5" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+                <Lock className="w-4 h-4 text-[#C5A15A] dark:text-[#D6B878]" />
+                <span>الأمان والحساب</span>
+              </h3>
+
+              <div className="space-y-2 text-xs text-[#77717A] dark:text-[#B8B1BB]">
+                <p className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                  <span dir="ltr" className="font-mono">{currentUser.email}</span>
+                </p>
+                <p>سنرسل رابطاً آمناً إلى بريدك لتغيير كلمة السر دون الحاجة لكلمة السر القديمة.</p>
+              </div>
+
+              {resetFeedback && (
+                <div
+                  role="status"
+                  className="p-3 rounded-2xl text-[11px] flex items-start gap-2 border"
+                  style={{
+                    backgroundColor: resetFeedback.type === 'success'
+                      ? (theme === 'dark' ? 'rgba(32, 53, 42, 0.7)' : '#E9F4EC')
+                      : (theme === 'dark' ? 'rgba(61,36,42,.75)' : '#F9E9EB'),
+                    color: resetFeedback.type === 'success'
+                      ? (theme === 'dark' ? '#75C695' : '#347653')
+                      : (theme === 'dark' ? '#F08089' : '#B33B49'),
+                    borderColor: resetFeedback.type === 'success'
+                      ? (theme === 'dark' ? 'rgba(117,198,149,0.3)' : '#C8E3D2')
+                      : (theme === 'dark' ? '#69404D' : '#DFC0CA'),
+                  }}
+                >
+                  {resetFeedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                  <span>{resetFeedback.message}</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSendPasswordReset}
+                disabled={resetSending}
+                className="w-full py-2.5 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all hover:scale-[1.01] disabled:opacity-60"
+                style={{
+                  backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.6)' : 'rgba(248, 247, 244, 0.9)',
+                  borderColor: theme === 'dark' ? 'rgba(214, 184, 120, 0.35)' : '#DFC0CA',
+                  color: theme === 'dark' ? '#F3DEAB' : '#76243A',
+                }}
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{resetSending ? 'جاري الإرسال...' : 'إعادة تعيين كلمة السر'}</span>
+              </button>
+
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={() => setLogoutConfirmOpen(true)}
+                  className="w-full py-2.5 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all hover:scale-[1.01]"
+                  style={{
+                    backgroundColor: theme === 'dark' ? 'rgba(61,36,42,.5)' : '#FDF2F4',
+                    borderColor: theme === 'dark' ? '#69404D' : '#F0CBD3',
+                    color: theme === 'dark' ? '#F08089' : '#B33B49',
+                  }}
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>تسجيل الخروج</span>
+                </button>
               )}
             </div>
           </div>
@@ -1400,6 +1505,61 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
                 تأكيد واعتماد الإيميل (+)
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {logoutConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div
+            className="w-full max-w-sm rounded-3xl border p-6 space-y-4 shadow-2xl text-center"
+            style={{
+              background: theme === 'dark'
+                ? 'linear-gradient(135deg, rgba(33, 31, 37, 0.96) 0%, rgba(22, 20, 25, 0.98) 100%)'
+                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 247, 244, 0.99) 100%)',
+              borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(118,36,58,0.15)',
+            }}
+          >
+            <div
+              className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center"
+              style={{
+                backgroundColor: theme === 'dark' ? '#38232C' : '#F3E7EB',
+                color: theme === 'dark' ? '#B65370' : '#76243A',
+              }}
+            >
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+              تسجيل الخروج؟
+            </h3>
+            <p className="text-xs text-[#77717A] dark:text-[#B8B1BB]">
+              ستحتاج إلى إدخال بريدك وكلمة السر مرة أخرى للدخول.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setLogoutConfirmOpen(false)}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-bold border"
+                style={{
+                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                  color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                }}
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLogoutConfirmOpen(false);
+                  onLogout?.();
+                }}
+                className="flex-1 py-2.5 rounded-2xl text-xs font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #76243A 0%, #541424 100%)' }}
+              >
+                خروج
+              </button>
+            </div>
           </div>
         </div>
       )}
