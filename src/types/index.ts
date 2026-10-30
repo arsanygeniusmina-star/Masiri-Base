@@ -44,6 +44,17 @@ export interface ManagedRoleAccount {
   created_at?: string;
 }
 
+export interface ManagedStudent {
+  id: string;
+  email: string;
+  name: string;
+  gradeLevel?: MiddleSchoolGrade | null;
+  points: number;
+  streakDays: number;
+  avatarUrl?: string | null;
+  createdAt?: string;
+}
+
 export interface DailySpiritualTask {
   id: string;
   title: string;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, MiddleSchoolGrade, TeacherWhitelistEntry, ManagedRoleAccount } from '../types';
+import { User, MiddleSchoolGrade, TeacherWhitelistEntry, ManagedRoleAccount, ManagedStudent } from '../types';
 import { supabase, mapUserProfile } from '../lib/supabase';
 import {
   User as UserIcon,
@@ -22,6 +22,8 @@ import {
   UserPlus,
   Camera,
   Image,
+  Users,
+  Search,
 } from 'lucide-react';
 import { SupabaseGuideModal } from '../components/SupabaseGuideModal';
 import { AppScreen } from '../components/NavigationTaskbar';
@@ -118,7 +120,14 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
   const [isSupabaseGuideOpen, setIsSupabaseGuideOpen] = useState(false);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'profile' | 'teachers'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'teachers' | 'students'>('profile');
+
+  // Student management state (Head / Teacher)
+  const [studentsList, setStudentsList] = useState<ManagedStudent[]>([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentFeedback, setStudentFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
 
   // Avatar Upload State
   const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl || '');
@@ -202,6 +211,53 @@ const ProfileScreenInner: React.FC<ProfileScreenInnerProps> = ({
     void loadAll();
     return () => { cancelled = true; };
   }, [isHead, currentUser.id, simulationMode]);
+
+  // Load students when the Students tab is opened (Head sees all; Teacher sees own grade via RLS).
+  useEffect(() => {
+    let cancelled = false;
+    if (activeTab !== 'students' || (!isHead && !isTeacher)) return () => { cancelled = true; };
+
+    if (simulationMode) {
+      setStudentsList([
+        { id: 'preview-student-1', name: 'مارك عماد رفعت', email: 'mark.student@example.test', gradeLevel: 'grade-1', points: 145, streakDays: 9, avatarUrl: null, createdAt: new Date().toISOString() },
+        { id: 'preview-student-2', name: 'كيرلس سامح عادل', email: 'kyrillos.student@example.test', gradeLevel: 'grade-2', points: 120, streakDays: 6, avatarUrl: null, createdAt: new Date().toISOString() },
+        { id: 'preview-student-3', name: 'مينا أشرف فؤاد', email: 'mina.student@example.test', gradeLevel: 'grade-3', points: 98, streakDays: 3, avatarUrl: null, createdAt: new Date().toISOString() },
+      ]);
+      return () => { cancelled = true; };
+    }
+
+    const loadStudents = async () => {
+      setStudentsLoading(true);
+      setStudentFeedback(null);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, email, name, grade_level, points, streak_days, avatar_url, created_at')
+        .eq('role', 'student')
+        .order('name');
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('Unable to load students:', error);
+        setStudentFeedback({ type: 'error', message: 'تعذر تحميل قائمة الطلاب. تحقق من الصلاحيات.' });
+      } else {
+        setStudentsList((data || []).map((row: any) => ({
+          id: row.id,
+          email: row.email,
+          name: row.name,
+          gradeLevel: row.grade_level || null,
+          points: row.points ?? 0,
+          streakDays: row.streak_days ?? 0,
+          avatarUrl: row.avatar_url || null,
+          createdAt: row.created_at,
+        })));
+      }
+      setStudentsLoading(false);
+    };
+
+    void loadStudents();
+    return () => { cancelled = true; };
+  }, [activeTab, isHead, isTeacher, simulationMode]);
 
   // Persist profile changes in Supabase; local storage is not the source of truth for account data.
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -519,6 +575,47 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
     setWhitelistFeedback({ type: 'success', message: `تم إلغاء اعتماد ${teacherName} من قاعدة البيانات.` });
   };
 
+  const handleDeleteStudent = async (student: ManagedStudent) => {
+    if (!isHead) return;
+    if (!window.confirm(`هل أنت متأكد من حذف حساب الطالب (${student.name})؟ سيتم حذف بياناته نهائياً ولا يمكن التراجع.`)) return;
+
+    setStudentFeedback(null);
+
+    if (simulationMode) {
+      setStudentsList((previous) => previous.filter((row) => row.id !== student.id));
+      setStudentFeedback({ type: 'success', message: `تم حذف ${student.name} في المحاكاة فقط.` });
+      return;
+    }
+
+    setDeletingStudentId(student.id);
+    try {
+      const { error } = await supabase.rpc('delete_student_account', { p_student_id: student.id });
+      if (error) throw error;
+
+      setStudentsList((previous) => previous.filter((row) => row.id !== student.id));
+      setStudentFeedback({ type: 'success', message: `تم حذف حساب الطالب ${student.name} نهائياً.` });
+    } catch (error) {
+      console.error('Unable to delete student:', error);
+      const message = (error as { message?: string })?.message || '';
+      setStudentFeedback({
+        type: 'error',
+        message: message.includes('Could not find the function')
+          ? 'دالة الحذف غير موجودة في قاعدة البيانات. شغّل ملف delete_student_account.sql في Supabase.'
+          : message.includes('Only student')
+            ? 'يمكن حذف حسابات الطلاب فقط من هذه الصفحة.'
+            : 'تعذر حذف الطالب. تحقق من صلاحية أمين الخدمة.',
+      });
+    } finally {
+      setDeletingStudentId(null);
+    }
+  };
+
+  const filteredStudents = studentsList.filter((student) => {
+    const query = studentSearch.trim().toLowerCase();
+    if (!query) return true;
+    return student.name.toLowerCase().includes(query) || student.email.toLowerCase().includes(query);
+  });
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 relative">
       {/* Background Ambient Glow */}
@@ -749,6 +846,32 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               </span>
             )}
           </button>
+
+          {/* Tab 3: Students list (Head sees all; Teacher sees own grade) */}
+          {(isHead || isTeacher) && (
+            <button
+              onClick={() => setActiveTab('students')}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap"
+              style={{
+                backgroundColor: activeTab === 'students' ? (theme === 'dark' ? '#76243A' : '#F3E7EB') : 'transparent',
+                color: activeTab === 'students' ? (theme === 'dark' ? '#F3DEAB' : '#76243A') : (theme === 'dark' ? '#B8B1BB' : '#77717A'),
+                border: activeTab === 'students' ? `1px solid ${theme === 'dark' ? 'rgba(214, 184, 120, 0.45)' : '#DFC0CA'}` : '1px solid transparent',
+              }}
+            >
+              <Users className="w-4 h-4" />
+              <span>الطلاب</span>
+              <span
+                className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold"
+                style={{
+                  backgroundColor: theme === 'dark' ? '#541424' : '#76243A',
+                  color: theme === 'dark' ? '#F3DEAB' : '#FFFFFF',
+                  border: theme === 'dark' ? '1px solid rgba(214, 184, 120, 0.3)' : 'none',
+                }}
+              >
+                {studentsList.length}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Supabase connection guide button */}
@@ -1384,6 +1507,157 @@ async function uploadAvatarToSupabase(userId: string, photo: Blob): Promise<stri
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Tab 3: Students Management (Head can see and delete) */}
+      {activeTab === 'students' && (isHead || isTeacher) && (
+        <div className="space-y-6">
+          <div
+            className="rounded-3xl border p-6 sm:p-7 space-y-4 text-right backdrop-blur-2xl shadow-xl"
+            style={{
+              background:
+                theme === 'dark'
+                  ? 'linear-gradient(135deg, rgba(33, 31, 37, 0.75) 0%, rgba(22, 20, 25, 0.85) 100%)'
+                  : 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(248, 247, 244, 0.85) 100%)',
+              borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.8)',
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+              <span className="text-xs text-[#77717A] dark:text-[#B8B1BB]">
+                إجمالي الطلاب: <strong>{studentsList.length}</strong>
+                {!isHead && <span className="mr-2">· عرض طلاب فصلك فقط</span>}
+              </span>
+              <h2 className="text-base font-bold flex items-center gap-1.5" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+                <Users className="w-4 h-4 text-[#C5A15A] dark:text-[#D6B878]" />
+                <span>قائمة الطلاب</span>
+              </h2>
+            </div>
+
+            <div className="relative">
+              <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-[#77717A] dark:text-[#B8B1BB]" />
+              <input
+                type="search"
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder="ابحث بالاسم أو الإيميل..."
+                className="w-full pr-10 pl-3.5 py-2.5 rounded-2xl text-xs border focus:outline-none focus:ring-2 focus:ring-[#76243A]"
+                style={{
+                  backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(255, 255, 255, 0.7)',
+                  borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                  color: theme === 'dark' ? '#F5F1F0' : '#272329',
+                }}
+              />
+            </div>
+
+            {studentFeedback && (
+              <div
+                role="status"
+                className="p-3.5 rounded-2xl text-xs flex items-center gap-2 border"
+                style={{
+                  backgroundColor: studentFeedback.type === 'success'
+                    ? (theme === 'dark' ? 'rgba(32, 53, 42, 0.7)' : '#E9F4EC')
+                    : (theme === 'dark' ? 'rgba(61,36,42,.75)' : '#F9E9EB'),
+                  color: studentFeedback.type === 'success'
+                    ? (theme === 'dark' ? '#75C695' : '#347653')
+                    : (theme === 'dark' ? '#F08089' : '#B33B49'),
+                  borderColor: studentFeedback.type === 'success'
+                    ? (theme === 'dark' ? 'rgba(117,198,149,0.3)' : '#C8E3D2')
+                    : (theme === 'dark' ? '#69404D' : '#DFC0CA'),
+                }}
+              >
+                {studentFeedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                <span>{studentFeedback.message}</span>
+              </div>
+            )}
+
+            {studentsLoading ? (
+              <div className="py-10 text-center text-xs text-[#77717A] dark:text-[#B8B1BB]">
+                <span className="animate-spin inline-block mr-2">⏳</span>
+                جاري تحميل الطلاب...
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="py-10 text-center text-xs text-[#77717A] dark:text-[#B8B1BB]">
+                {studentsList.length === 0 ? 'لا يوجد طلاب مسجلون حتى الآن.' : 'لا يوجد طالب مطابق للبحث.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filteredStudents.map((student) => (
+                  <div
+                    key={student.id}
+                    className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all hover:scale-[1.01]"
+                    style={{
+                      backgroundColor: theme === 'dark' ? 'rgba(42, 39, 48, 0.5)' : 'rgba(248, 247, 244, 0.8)',
+                      borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs shrink-0 overflow-hidden"
+                        style={{
+                          backgroundColor: theme === 'dark' ? '#20352A' : '#E9F4EC',
+                          color: theme === 'dark' ? '#75C695' : '#347653',
+                        }}
+                      >
+                        {student.avatarUrl ? (
+                          <img src={student.avatarUrl} alt={student.name} className="w-full h-full object-cover" />
+                        ) : (
+                          student.name.charAt(0) || 'ط'
+                        )}
+                      </div>
+                      <div className="text-right min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-bold text-xs sm:text-sm truncate" style={{ color: theme === 'dark' ? '#F5F1F0' : '#272329' }}>
+                            {student.name}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 font-semibold">
+                            {student.gradeLevel === 'grade-1'
+                              ? 'الصف السابع'
+                              : student.gradeLevel === 'grade-2'
+                                ? 'الصف الثامن'
+                                : student.gradeLevel === 'grade-3'
+                                  ? 'الصف التاسع'
+                                  : 'بدون صف'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#77717A] dark:text-[#B8B1BB] font-mono truncate" dir="ltr">
+                          {student.email}
+                        </p>
+                        <div className="flex items-center gap-3 text-[10px] text-[#77717A] dark:text-[#B8B1BB] mt-0.5">
+                          <span className="flex items-center gap-1">
+                            <Award className="w-3 h-3 text-[#C5A15A]" />
+                            {student.points} نقطة
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-[#C5A15A]" />
+                            {student.streakDays} يوم متتالي
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {isHead && (
+                      <button
+                        onClick={() => handleDeleteStudent(student)}
+                        disabled={deletingStudentId === student.id}
+                        title={`حذف الطالب ${student.name}`}
+                        className="p-2 rounded-xl border text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50 shrink-0"
+                        style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
+                      >
+                        {deletingStudentId === student.id ? <span className="animate-spin inline-block">⏳</span> : <Trash2 className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {isHead && (
+              <p className="text-[11px] text-[#77717A] dark:text-[#B8B1BB] border-t pt-3" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+                حذف الطالب يزيل حسابه وكل بياناته (الحضور، النقاط، القراءات، الصور) نهائياً.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
