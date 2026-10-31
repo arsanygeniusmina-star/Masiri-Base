@@ -13,13 +13,11 @@ interface FeedScreenProps {
   simulationMode?: boolean;
 }
 
-const ROLE_LABELS: Record<string, string> = { head: 'أمين الخدمة', teacher: 'خادم', student: '' };
-
 function demoPosts(): FeedPost[] {
-  const names: Array<[string, string, number, number]> = [['مارك', 'student', 12, 9], ['بيتر', 'teacher', 8, 21], ['مريم', 'student', 5, 4]];
-  return names.map(([name, role, likes, streak], i) => ({
+  const names: Array<[string, string, number, number, string]> = [['مارك', 'student', 12, 9, 'ربنا يبارك في يومي'], ['بيتر', 'teacher', 8, 21, ' peace '], ['مريم', 'student', 5, 4, '']];
+  return names.map(([name, role, likes, streak, answer], i) => ({
     completionId: `demo-${i}`, userId: `demo-user-${i}`, name, role: role as FeedPost['role'], photoPath: '', readingDate: '2026-10-30',
-    reference: 'سفر التكوين ١', completedAt: new Date().toISOString(), likeCount: likes, likedByMe: false, currentStreak: streak,
+    reference: 'سفر التكوين ١', answerText: answer, completedAt: new Date().toISOString(), likeCount: likes, likedByMe: false, currentStreak: streak,
   }));
 }
 
@@ -40,8 +38,6 @@ const PostCard: React.FC<{ post: FeedPost; theme: 'light' | 'dark'; onToggleLike
     return () => { cancelled = true; };
   }, [post.photoPath]);
 
-  const roleLabel = ROLE_LABELS[post.role] ?? '';
-
   // No photo (or it can't be shown) → no post at all.
   if (!post.photoPath || failed) return null;
 
@@ -59,8 +55,13 @@ const PostCard: React.FC<{ post: FeedPost; theme: 'light' | 'dark'; onToggleLike
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-black sm:text-base" style={{ color: p.text }}>{post.name}</span>
           <span className="block truncate text-xs" style={{ color: p.muted }}>
-            {[roleLabel, post.reference].filter(Boolean).join(' · ')}
+            {post.reference}
           </span>
+          {post.answerText && (
+            <span className="block truncate text-sm" style={{ color: p.text }}>
+              «{post.answerText}»
+            </span>
+          )}
         </span>
         <StreakBadge value={post.currentStreak} size="md" color={p.accentText} />
       </header>

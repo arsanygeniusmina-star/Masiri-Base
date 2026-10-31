@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { UserRole } from '../types';
 
-/** One completed daily reading shown in «الرئيسية» (the answer is never included). */
+/** One completed daily reading shown in «الرئيسية» (now includes the answer). */
 export interface FeedPost {
   completionId: string;
   userId: string;
@@ -11,6 +11,7 @@ export interface FeedPost {
   photoPath: string;
   readingDate: string;
   reference?: string;
+  answerText: string;
   completedAt: string;
   likeCount: number;
   likedByMe: boolean;
@@ -26,6 +27,7 @@ type FeedRow = {
   photo_path: string;
   reading_date: string;
   reference_ar: string | null;
+  answer_text: string | null;
   completed_at: string;
   like_count: number | null;
   liked_by_me: boolean | null;
@@ -50,6 +52,7 @@ export async function fetchReadingFeed(offset = 0, limit = FEED_PAGE_SIZE): Prom
     completedAt: row.completed_at,
     likeCount: Number(row.like_count || 0),
     likedByMe: Boolean(row.liked_by_me),
+    answerText: row.answer_text || '',
     currentStreak: Number(row.current_streak || 0),
   }));
 }

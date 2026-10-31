@@ -45,7 +45,7 @@ $function$;
 revoke all on function public.hide_feed_post(uuid) from public, anon;
 grant execute on function public.hide_feed_post(uuid) to authenticated;
 
--- Feed without removed posts
+-- Feed without removed posts (now includes the student's written answer)
 create or replace function public.get_reading_feed(p_limit integer default 30, p_offset integer default 0)
 returns table (
   completion_id uuid,
@@ -56,6 +56,7 @@ returns table (
   photo_path text,
   reading_date date,
   reference text,
+  answer_text text,
   completed_at timestamptz,
   like_count integer,
   liked_by_me boolean,
@@ -70,6 +71,7 @@ as $function$
     select
       c.id,
       c.student_id,
+      c.assignment_id,
       c.photo_path,
       coalesce(c.credited_date, c.local_date) as reading_date,
       c.completed_at,
@@ -96,6 +98,7 @@ as $function$
     p.photo_path,
     p.reading_date,
     bp.reference_ar,
+    coalesce(ra.answer_text, ''),
     p.completed_at,
     p.like_count,
     exists (select 1 from public.reading_likes as l where l.completion_id = p.id and l.user_id = auth.uid()),
@@ -105,6 +108,7 @@ as $function$
   left join public.reading_completions as c on c.id = p.id
   left join public.reading_assignments as a on a.id = c.assignment_id
   left join public.bible_passages as bp on bp.id = a.passage_id
+  left join public.reading_answers as ra on ra.assignment_id = p.assignment_id and ra.student_id = p.student_id
   left join streaks as s on s.student_id = p.student_id
   order by p.like_count desc, p.completed_at desc
 $function$;
