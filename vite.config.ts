@@ -79,36 +79,6 @@ export default defineConfig(() => {
               purpose: 'any',
             },
           ],
-          shortcuts: [
-            {
-              name: 'إصحاح النهارده',
-              short_name: 'إصحاح اليوم',
-              description: 'افتح قراءة اليوم بسرعة من أيقونة التطبيق',
-              url: '/my-readings',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
-            },
-            {
-              name: 'سلسلة القراءة',
-              short_name: 'السلسلة',
-              description: 'شاهد سلسلة قراءتك اليومية المتتالية',
-              url: '/profile',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
-            },
-            {
-              name: 'طلب صلاة',
-              short_name: 'صلاة',
-              description: 'أرسل طلب صلاة أو سؤال روحي',
-              url: '/student-dashboard',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
-            },
-            {
-              name: 'الأدوات المصغرة',
-              short_name: 'أدوات',
-              description: 'إدارة الأدوات المصغرة والاختصارات',
-              url: '/widgets',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
-            },
-          ],
           screenshots: [
             {
               src: '/pwa-512x512.png',
