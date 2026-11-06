@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center">
+
+    <ImageView
+        android:id="@+id/widget_icon"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/ic_launcher"
+        android:contentDescription="THE APOSTLES logo" />
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="THE APOSTLES"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:textAlignment="center" />
+
+    <TextView
+        android:id="@+id/widget_streak"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="سلسلة القراءة: 0 يوم"
+        android:textColor="#D6B878"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:textAlignment="center"
+        android:layout_marginTop="4dp" />
+
+    <TextView
+        android:id="@+id/widget_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="اضغط لفتح قراءة اليوم"
+        android:textColor="#B8B1BB"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:textAlignment="center"
+        android:layout_marginTop="2dp" />
+
+</LinearLayout>
