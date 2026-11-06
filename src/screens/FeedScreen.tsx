@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Heart, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import type { User } from '../types';
-import { FEED_PAGE_SIZE, deletePost, fetchReadingFeed, likePost, unlikePost, type FeedPost } from '../lib/feed';
+import { FEED_PAGE_SIZE, deletePost, fetchReadingFeed, likePost, unlikePost, type FeedPost, type FeedSort } from '../lib/feed';
 import { getReadingPhotoUrl } from '../lib/readings';
 import { readingPalette, secondaryButtonStyle } from '../components/readings/readingTheme';
 import { StreakBadge } from '../components/readings/StreakBadge';
+import { DoubleTapLike } from '../components/DoubleTapLike';
 import { STREAK_CHANGED_EVENT } from '../lib/useReadingStreak';
 
 interface FeedScreenProps {
@@ -57,22 +58,26 @@ const PostCard: React.FC<{ post: FeedPost; theme: 'light' | 'dark'; onToggleLike
           <span className="block truncate text-xs" style={{ color: p.muted }}>
             {post.reference}
           </span>
-          {post.answerText && (
-            <span className="block truncate text-sm" style={{ color: p.text }}>
-              «{post.answerText}»
-            </span>
-          )}
         </span>
         <StreakBadge value={post.currentStreak} size="md" color={p.accentText} />
       </header>
 
-      {/* Photo */}
-      <div className="flex aspect-square w-full items-center justify-center" style={{ backgroundColor: p.surfaceAlt }}>
-        {/* The post stays hidden until this photo has fully loaded. */}
-        {url && (
-          <img src={url} alt={`صورة ${post.name} بعد القراءة`} className="h-full w-full object-cover" onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
-        )}
-      </div>
+      {/* Answer published by a head servant — on top of the post */}
+      {post.publishedAnswer && (
+        <p className="mx-3.5 mb-3 rounded-2xl p-3 text-sm leading-7" style={{ backgroundColor: p.surfaceAlt, color: p.text, border: `1px solid ${p.border}` }}>
+          «{post.publishedAnswer}»
+        </p>
+      )}
+
+      {/* Photo — double-tap to like */}
+      <DoubleTapLike onLike={() => { if (!post.likedByMe) onToggleLike(post); }}>
+        <div className="flex aspect-square w-full items-center justify-center" style={{ backgroundColor: p.surfaceAlt }}>
+          {/* The post stays hidden until this photo has fully loaded. */}
+          {url && (
+            <img src={url} alt={`صورة ${post.name} بعد القراءة`} className="h-full w-full object-cover" draggable={false} onLoad={() => setLoaded(true)} onError={() => setFailed(true)} />
+          )}
+        </div>
+      </DoubleTapLike>
 
       {/* Like — on the left under the photo */}
       <footer className="flex items-center justify-between p-3">
@@ -106,7 +111,16 @@ const PostCard: React.FC<{ post: FeedPost; theme: 'light' | 'dark'; onToggleLike
   );
 };
 
-/** «الرئيسية»: every completed daily reading, most liked first. */
+const SORT_KEY = 'apostles-feed-sort';
+function savedSort(): FeedSort {
+  try {
+    return window.localStorage.getItem(SORT_KEY) === 'likes' ? 'likes' : 'recent';
+  } catch {
+    return 'recent';
+  }
+}
+
+/** «الرئيسية»: every completed daily reading — newest first by default, or most liked first. */
 export const FeedScreen: React.FC<FeedScreenProps> = ({ currentUser, theme, simulationMode = false }) => {
   const p = readingPalette(theme);
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -114,12 +128,27 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ currentUser, theme, simu
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
+  // Each person picks the order they like; remembered on their device.
+  const [sort, setSort] = useState<FeedSort>(savedSort);
+  const sortRef = useRef(sort);
+  sortRef.current = sort;
+  const changeSort = (next: FeedSort) => {
+    if (next === sort) return;
+    try {
+      window.localStorage.setItem(SORT_KEY, next);
+    } catch {
+      /* storage unavailable */
+    }
+    setSort(next);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const first = simulationMode ? demoPosts() : await fetchReadingFeed(0);
+      const first = simulationMode
+        ? [...demoPosts()].sort((a, b) => (sort === 'likes' ? b.likeCount - a.likeCount : 0))
+        : await fetchReadingFeed(0, FEED_PAGE_SIZE, sort);
       setPosts(first);
       setHasMore(!simulationMode && first.length === FEED_PAGE_SIZE);
     } catch (loadError) {
@@ -128,7 +157,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ currentUser, theme, simu
     } finally {
       setLoading(false);
     }
-  }, [simulationMode]);
+  }, [simulationMode, sort]);
 
   useEffect(() => {
     void load();
@@ -145,7 +174,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ currentUser, theme, simu
       if (busy || document.visibilityState === 'hidden') return;
       busy = true;
       try {
-        const latest = await fetchReadingFeed(0, Math.min(100, shownCount.current));
+        const latest = await fetchReadingFeed(0, Math.min(100, shownCount.current), sortRef.current);
         setPosts(latest);
         setHasMore(latest.length === Math.min(100, shownCount.current));
         setError('');
@@ -170,7 +199,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ currentUser, theme, simu
   const loadMore = async () => {
     setLoadingMore(true);
     try {
-      const next = await fetchReadingFeed(posts.length);
+      const next = await fetchReadingFeed(posts.length, FEED_PAGE_SIZE, sort);
       setPosts((current) => {
         const seen = new Set(current.map((post) => post.completionId));
         return [...current, ...next.filter((post) => !seen.has(post.completionId))];
@@ -214,7 +243,22 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ currentUser, theme, simu
 
   return (
     <div className="mx-auto max-w-xl space-y-4 px-4 py-6" dir="rtl">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex rounded-2xl p-1" role="radiogroup" aria-label="ترتيب المنشورات" style={{ backgroundColor: p.surfaceAlt, border: `1px solid ${p.border}` }}>
+          {([['recent', 'الأحدث'], ['likes', 'الأكثر إعجاباً']] as Array<[FeedSort, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={sort === value}
+              onClick={() => changeSort(value)}
+              className="rounded-xl px-4 py-2 text-sm font-black transition-colors"
+              style={sort === value ? { backgroundColor: p.primary, color: '#FFFFFF' } : { color: p.muted }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-10 w-10 items-center justify-center rounded-xl disabled:opacity-50" style={secondaryButtonStyle(p)} aria-label="تحديث" title="تحديث">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </button>

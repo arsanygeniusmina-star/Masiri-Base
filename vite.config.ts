@@ -49,6 +49,33 @@ export default defineConfig(() => {
               purpose: 'any',
             },
           ],
+          shortcuts: [
+            {
+              name: 'إصحاح النهارده',
+              short_name: 'إصحاح اليوم',
+              description: 'افتح قراءة اليوم بسرعة من أيقونة التطبيق',
+              url: '/my-readings',
+              icons: [{ src: '/masiri-journey-icon.jpg?v=20261010-2', sizes: '256x256' }],
+            },
+            {
+              name: 'سلسلة القراءة',
+              short_name: 'السلسلة',
+              description: 'شاهد سلسلة قراءتك اليومية المتتالية',
+              url: '/profile',
+              icons: [{ src: '/masiri-journey-icon.jpg?v=20261010-2', sizes: '256x256' }],
+            },
+            {
+              name: 'طلب صلاة',
+              short_name: 'صلاة',
+              description: 'أرسل طلب صلاة أو سؤال روحي',
+              url: '/student-dashboard',
+              icons: [{ src: '/masiri-journey-icon.jpg?v=20261010-2', sizes: '256x256' }],
+            },
+          ],
+        },
+        // Push notifications (shown even when the app is closed): public/push-sw.js
+        workbox: {
+          importScripts: ['push-sw.js'],
         },
         devOptions: {
           enabled: false,

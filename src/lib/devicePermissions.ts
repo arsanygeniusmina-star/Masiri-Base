@@ -24,13 +24,34 @@ export function notificationState(): PermissionResult {
   return Notification.permission === 'default' ? 'prompt' : (Notification.permission as PermissionResult);
 }
 
+const CAMERA_OK_KEY = 'masiri.camera-ok.v1';
+
+/** Remembers on this phone that the camera worked (some browsers can't report it). */
+export function rememberCameraWorks() {
+  try {
+    window.localStorage.setItem(CAMERA_OK_KEY, '1');
+  } catch {
+    // Storage blocked: harmless.
+  }
+}
+
+function cameraKnownToWork(): boolean {
+  try {
+    return window.localStorage.getItem(CAMERA_OK_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export async function cameraState(): Promise<PermissionResult> {
   if (!cameraSupported()) return 'unsupported';
   try {
     const status = await navigator.permissions.query({ name: 'camera' as PermissionName });
-    return status.state as PermissionResult;
+    if (status.state === 'granted') rememberCameraWorks();
+    return status.state === 'prompt' && cameraKnownToWork() ? 'granted' : (status.state as PermissionResult);
   } catch {
-    return 'prompt'; // Permissions API not available for camera (e.g. some iOS versions).
+    // Permissions API not available for camera (e.g. some iOS versions).
+    return cameraKnownToWork() ? 'granted' : 'prompt';
   }
 }
 
@@ -51,6 +72,7 @@ export async function requestCameraPermission(): Promise<PermissionResult> {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
     stream.getTracks().forEach((track) => track.stop());
+    rememberCameraWorks();
     return 'granted';
   } catch (error) {
     const name = error instanceof DOMException ? error.name : '';

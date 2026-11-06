@@ -21,7 +21,15 @@ import { TestRoleSwitcher } from './components/TestRoleSwitcher';
 import { JourneyTransition } from './components/JourneyTransition';
 import { LogoBackdrop } from './components/LogoBackdrop';
 import { useReadingStreak } from './lib/useReadingStreak';
-import { PermissionsOnboarding, shouldShowPermissionsOnboarding } from './components/PermissionsOnboarding';
+import { useFlaggedAnswers } from './lib/useFlaggedAnswers';
+import { remindTodaysChapter } from './lib/readingReminders';
+import { ensurePushSubscription } from './lib/push';
+import { localDateKey } from './lib/readingDates';
+import { ReviewScreen } from './screens/ReviewScreen';
+import { SpinWheelScreen, canUseSpinWheel } from './screens/SpinWheelScreen';
+import { WariniScreen } from './screens/WariniScreen';
+import { WidgetsScreen } from './screens/WidgetsScreen';
+import { PermissionsOnboarding, needsPermissionsPrompt, permissionsForcedByLink } from './components/PermissionsOnboarding';
 import { startTestRuntimeLogCapture } from './lib/testRuntimeLogs';
 
 const dashboardFor = (user: User): AppScreen =>
@@ -48,7 +56,7 @@ export default function App() {
   const [journeyTransitionUser, setJourneyTransitionUser] = useState<User | null>(null);
   const [journeyDestination, setJourneyDestination] = useState<AppScreen | null>(null);
   // First launch of the installed app: ask for notifications + camera.
-  const [showPermissions, setShowPermissions] = useState(() => shouldShowPermissionsOnboarding());
+  const [showPermissions, setShowPermissions] = useState(() => permissionsForcedByLink());
 
   useEffect(() => {
     Database.setTheme(theme);
@@ -82,7 +90,7 @@ export default function App() {
   // page is open, show the login page instead of an empty screen.
   useEffect(() => {
     if (!sessionReady || currentUser) return;
-    const signedInOnly: AppScreen[] = ['dashboard', 'student-dashboard', 'servant-dashboard', 'my-readings', 'bible-study', 'ranking', 'test', 'supabase'];
+    const signedInOnly: AppScreen[] = ['dashboard', 'student-dashboard', 'servant-dashboard', 'my-readings', 'bible-study', 'ranking', 'review', 'test', 'supabase', 'spin-wheel', 'warini', 'widgets'];
     // The home page is "Coming Soon" for now, so signed-out visitors start at login.
     if (signedInOnly.includes(currentScreen) || currentScreen === 'get-started') setCurrentScreen('login');
   }, [sessionReady, currentUser, currentScreen]);
@@ -277,6 +285,10 @@ export default function App() {
       setCurrentScreen('login');
       return;
     }
+    if (screen === 'widgets' && !currentUser) {
+      setCurrentScreen('login');
+      return;
+    }
     if (screen === 'profile' && !currentUser) {
       setCurrentScreen('profile');
       return;
@@ -316,12 +328,47 @@ export default function App() {
 
   // Restore flow: opens the earliest missed (still restorable) reading, then the next…
   const [restoreMode, setRestoreMode] = useState(false);
+  // Changes on every tap so «Restore» always reacts, even if restore mode is already on.
+  const [restoreRequest, setRestoreRequest] = useState(0);
   const startRestore = () => {
     setRestoreMode(true);
+    setRestoreRequest((count) => count + 1);
     handleNavigate('my-readings');
   };
 
   // Reading Streak shown next to the user's name in the top bar on every page.
+  // Head servants: flagged answers for «متابعة» + notifications, on every page.
+  const flagged = useFlaggedAnswers(currentUser?.role === 'head' && !previewRole);
+
+  // Daily chapter notification as soon as the app opens (any page), once a day.
+  const currentUserId = currentUser?.id;
+  const currentUserRole = currentUser?.role;
+  useEffect(() => {
+    if (!currentUserId || !currentUserRole || currentUserRole === 'test') return;
+    void remindTodaysChapter(currentUserId, currentUserRole, localDateKey());
+    // Ask for notifications + camera if still missing (once a day), then register for push.
+    void needsPermissionsPrompt().then((needed) => {
+      if (needed) setShowPermissions(true);
+    });
+    // Register this phone for real push notifications (work even when the app is closed).
+    void ensurePushSubscription();
+  }, [currentUserId, currentUserRole]);
+
+  // A tapped notification opens /?screen=my-readings, /?screen=review or
+  // /?screen=warini&user=<id> (someone's new reading).
+  const [wariniOpenUser, setWariniOpenUser] = useState<string | null>(null);
+  useEffect(() => {
+    if (!currentUserId || !currentUserRole) return;
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get('screen');
+    if (target !== 'my-readings' && target !== 'review' && target !== 'warini') return;
+    window.history.replaceState({}, '', window.location.pathname);
+    if (target === 'review' && currentUserRole !== 'head') return;
+    if (currentUserRole === 'test') return;
+    if (target === 'warini') setWariniOpenUser(params.get('user'));
+    setCurrentScreen(target);
+  }, [currentUserId, currentUserRole]);
+
   const topBarStreak = useReadingStreak(displayUser?.id, displayUser?.role === 'student' || displayUser?.role === 'teacher' || displayUser?.role === 'head', simulationMode, displayUser?.streakDays ?? 0);
 
   const renderDashboard = () => {
@@ -368,6 +415,7 @@ export default function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           streak={topBarStreak}
+          reviewCount={flagged.pendingCount}
           onRestore={startRestore}
         />
       </div>
@@ -434,6 +482,7 @@ export default function App() {
                 theme={theme}
                 simulationMode={simulationMode}
                 restoreMode={restoreMode}
+                restoreRequest={restoreRequest}
                 onRestoreDone={() => setRestoreMode(false)}
               />
             )}
@@ -441,6 +490,22 @@ export default function App() {
               <BibleStudyScreen currentUser={displayUser} theme={theme} simulationMode={simulationMode} />
             )}
             </>
+            )}
+            {currentScreen === 'review' && currentUser?.role === 'head' && !previewRole && (
+              <ReviewScreen theme={theme} items={flagged.items} loading={flagged.loading} onRefresh={() => void flagged.refresh()} />
+            )}
+            {currentScreen === 'spin-wheel' && canUseSpinWheel(currentUser?.email) && <SpinWheelScreen theme={theme} />}
+            {currentScreen === 'warini' && currentUser && currentUser.role !== 'test' && (
+              <WariniScreen
+                currentUser={currentUser}
+                theme={theme}
+                onOpenWheel={canUseSpinWheel(currentUser.email) && !simulationMode ? () => handleNavigate('spin-wheel') : undefined}
+                openUserId={wariniOpenUser}
+                onOpenedUser={() => setWariniOpenUser(null)}
+              />
+            )}
+            {currentScreen === 'widgets' && currentUser && (
+              <WidgetsScreen currentUser={displayUser} theme={theme} />
             )}
             {currentScreen === 'ranking' && displayUser && displayUser.role !== 'test' && (
               <RankingScreen currentUser={displayUser} theme={theme} simulationMode={simulationMode} />

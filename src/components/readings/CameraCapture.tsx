@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Check, Loader2, RefreshCw, RotateCcw, SwitchCamera, X } from 'lucide-react';
-import { cameraSupported } from '../../lib/devicePermissions';
+import { cameraSupported, rememberCameraWorks } from '../../lib/devicePermissions';
 
 interface CameraCaptureProps {
   theme: 'light' | 'dark';
@@ -43,6 +43,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ theme, onCapture, 
         audio: false,
       });
       streamRef.current = stream;
+      rememberCameraWorks();
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => undefined);

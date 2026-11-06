@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Camera, CalendarDays, CheckCircle2, Circle, Clock, Loader2, RefreshCw, RotateCcw, Send } from 'lucide-react';
+import { BookOpen, Camera, CalendarDays, CheckCircle2, Circle, Clock, Loader2, RefreshCw, RotateCcw, Send, Sparkles } from 'lucide-react';
 import type { ReadingAnswer, ReadingAssignment, ReadingCompletion, ReadingStreak, User } from '../types';
-import { NoPasteTextarea } from '../components/ui/animated-card';
 import {
   buildDemoReadingData,
   creditedDateOf,
@@ -15,14 +13,16 @@ import {
   fetchReadingCompletions,
   fetchReadingStreaks,
   markReadingComplete,
+  requestAnswerCheck,
   saveReadingAnswer,
 } from '../lib/readings';
 import { toArabicDigits } from '../lib/bible/bibleService';
-import { addDaysToKey, canCompleteReadingOn, formatLocalTime, formatLongDate, formatShortDate, localDateKey, relativeDayLabel } from '../lib/readingDates';
+import { addDaysToKey, canCompleteReadingOn, formatLocalTime, formatLongDate, formatShortDate, localDateKey, relativeDayLabel, restoreDeadline } from '../lib/readingDates';
 import { DailyVerseCard } from '../components/readings/DailyVerseCard';
 import { StreakBadge } from '../components/readings/StreakBadge';
 import { CameraCapture } from '../components/readings/CameraCapture';
 import { announceReadingStreakChanged } from '../lib/useReadingStreak';
+import { fetchHighlights, setHighlight } from '../lib/highlights';
 import {
   READINGS_PREVIEW_MODE,
   loadPreviewReadings,
@@ -39,10 +39,12 @@ interface MyReadingsScreenProps {
   simulationMode?: boolean;
   /** Step through missed (restorable) readings, oldest first, then land on today. */
   restoreMode?: boolean;
+  /** Increases on every «Restore» tap. */
+  restoreRequest?: number;
   onRestoreDone?: () => void;
 }
 
-export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser, theme, simulationMode = false, restoreMode = false, onRestoreDone }) => {
+export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser, theme, simulationMode = false, restoreMode = false, restoreRequest = 0, onRestoreDone }) => {
   // TEMPORARY: local Matthew 6 test mode until the database is linked (see lib/readingsPreview.ts).
   const localPreview = READINGS_PREVIEW_MODE && !simulationMode;
   const p = readingPalette(theme);
@@ -55,6 +57,12 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
   const [loadError, setLoadError] = useState('');
   const [focusId, setFocusId] = useState<string | null>(null);
   const [answerDraft, setAnswerDraft] = useState('');
+  const [pasteBlocked, setPasteBlocked] = useState(false);
+  const blockPaste = (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    setPasteBlocked(true);
+    window.setTimeout(() => setPasteBlocked(false), 2500);
+  };
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
   const [celebrate, setCelebrate] = useState(false);
@@ -157,9 +165,10 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
       setFocusId(todays[0]?.id ?? null);
       onRestoreDone?.();
     }
-    // Only when restore mode starts or data first arrives.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // On every «Restore» tap, and when data first arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restoreMode, loading]);
+  }, [restoreMode, restoreRequest, loading]);
 
   // Pick what to show first: today's pending → today's done → oldest restorable missed.
   useEffect(() => {
@@ -173,6 +182,26 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
   }, [assignments, todays, missed, completionByAssignment, focusId, today]);
 
   const focus = assignments.find((assignment) => assignment.id === focusId) ?? null;
+
+  // Highlighted verses of the reading on screen (tap a verse to highlight it).
+  const [highlights, setHighlights] = useState<Record<string, number[]>>({});
+  useEffect(() => {
+    if (!focusId) return;
+    let cancelled = false;
+    fetchHighlights([focusId], simulationMode)
+      .then((map) => { if (!cancelled) setHighlights((current) => ({ ...current, ...map })); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [focusId, simulationMode]);
+  const focusHighlights = focus ? highlights[focus.id] ?? [] : [];
+  const toggleHighlight = (verseNumber: number) => {
+    if (!focus) return;
+    const on = !focusHighlights.includes(verseNumber);
+    const next = on ? [...focusHighlights, verseNumber].sort((a, b) => a - b) : focusHighlights.filter((n) => n !== verseNumber);
+    setHighlights((current) => ({ ...current, [focus.id]: next }));
+    void setHighlight(focus.id, verseNumber, on, simulationMode);
+  };
+  const highlightedVerses = focus ? focus.passage.verses.filter((verse) => focusHighlights.includes(verse.number)) : [];
   const focusCompletion = focus ? completionByAssignment.get(focus.id) : undefined;
   const focusAnswer = focus ? answerByAssignment.get(focus.id) : undefined;
 
@@ -287,12 +316,15 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
         }
       } else {
         // 1) answer (required by the database when there is a question)
-        if (focus.questionText && text) applyAnswer(await saveReadingAnswer(focus.id, currentUser.id, text));
+        const savedAnswer = focus.questionText && text ? await saveReadingAnswer(focus.id, currentUser.id, text) : null;
+        if (savedAnswer) applyAnswer(savedAnswer);
         // 2) photo (uploaded once; reused if the completion step has to be retried)
         const photoPath = uploadedPhotoPath ?? (await uploadReadingPhoto(focus.id, currentUser.id, photoBlob));
         setUploadedPhotoPath(photoPath);
         // 3) completion → this is what counts for the streak
         applyCompletion(await markReadingComplete(focus.id, currentUser.id, photoPath, today));
+        // AI check of the answer; flagged answers go to the head servants.
+        if (savedAnswer) requestAnswerCheck(savedAnswer.id);
         // Re-sync the authoritative streak from the database.
         fetchReadingStreaks([currentUser.id], today).then((rows) => {
           if (!rows[0]) return;
@@ -337,12 +369,7 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" dir="rtl"
-    >
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8" dir="rtl">
       {/* Header + streak */}
       <div className="liquid-glass-card relative flex flex-col gap-5 overflow-hidden rounded-3xl p-6 sm:p-7 md:flex-row md:items-center md:justify-between">
         <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-[#C5A15A]/15 blur-2xl" />
@@ -389,74 +416,65 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
       ) : (
         <>
           {/* Daily reminder verse (آية اليوم) */}
-          <AnimatePresence mode="wait">
-            {todays[0] && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.3 }}
-              >
-                <DailyVerseCard
-                  theme={theme}
-                  assignment={todays[0]}
-                  completed={completionByAssignment.has(todays[0].id)}
-                  today={today}
-                  simulationMode={simulationMode}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {todays[0] && (
+            <DailyVerseCard
+              theme={theme}
+              assignment={todays[0]}
+              completed={completionByAssignment.has(todays[0].id)}
+              today={today}
+              simulationMode={simulationMode}
+            />
+          )}
+
+          {/* Verses you highlighted — right under the verse of the day */}
+          {focus && highlightedVerses.length > 0 && (
+            <section className="liquid-glass-card space-y-3 rounded-3xl p-5" aria-labelledby="highlights-title">
+              <h2 id="highlights-title" className="flex items-center gap-2 text-sm font-black" style={{ color: p.accentText }}>
+                <Sparkles className="h-4 w-4" /> الآيات اللي ميّزتها — {focus.passage.reference}
+              </h2>
+              <ul className="space-y-2">
+                {highlightedVerses.map((verse) => (
+                  <li key={verse.number} className="rounded-2xl p-3 text-base leading-8" style={{ backgroundColor: p.goldSoft, color: p.text, borderInlineStart: `4px solid ${p.accent}` }}>
+                    «{verse.text}»
+                    <span className="ms-2 text-xs font-black" style={{ color: p.accentText }}>({toArabicDigits(verse.number)})</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Today's selector when there is more than one reading */}
-          <AnimatePresence mode="wait">
-            {todays.length > 1 && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.3 }}
-                className="flex gap-2 overflow-x-auto pb-1"
-              >
-                {todays.map((assignment) => {
-                  const done = completionByAssignment.has(assignment.id);
-                  return (
-                    <motion.button
-                      key={assignment.id}
-                      type="button"
-                      onClick={() => setFocusId(assignment.id)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.96 }}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-bold"
-                      style={{
-                        backgroundColor: focusId === assignment.id ? p.soft : 'transparent',
-                        color: focusId === assignment.id ? p.accentText : p.muted,
-                        border: `1px solid ${focusId === assignment.id ? p.softBorder : p.border}`,
-                      }}
-                    >
-                      {done ? <CheckCircle2 className="h-4 w-4" style={{ color: p.success }} /> : <Clock className="h-4 w-4" />}
-                      {assignment.passage.reference}
-                    </motion.button>
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {todays.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {todays.map((assignment) => {
+                const done = completionByAssignment.has(assignment.id);
+                return (
+                  <button
+                    key={assignment.id}
+                    type="button"
+                    onClick={() => setFocusId(assignment.id)}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-bold"
+                    style={{
+                      backgroundColor: focusId === assignment.id ? p.soft : 'transparent',
+                      color: focusId === assignment.id ? p.accentText : p.muted,
+                      border: `1px solid ${focusId === assignment.id ? p.softBorder : p.border}`,
+                    }}
+                  >
+                    {done ? <CheckCircle2 className="h-4 w-4" style={{ color: p.success }} /> : <Clock className="h-4 w-4" />}
+                    {assignment.passage.reference}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Focus reading */}
           {focus ? (
-            <motion.article
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              whileHover={{ y: -2 }}
-              className="liquid-glass-card space-y-5 rounded-3xl p-5 sm:p-7" aria-labelledby="focus-reading-title"
-            >
+            <article className="liquid-glass-card space-y-5 rounded-3xl p-5 sm:p-7" aria-labelledby="focus-reading-title">
               <header className="flex flex-wrap items-start justify-between gap-3 border-b pb-4" style={{ borderColor: p.divider }}>
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold" style={{ color: focus.scheduledDate < today ? p.error : p.accent }}>
-                    {focus.scheduledDate === today ? 'قراءة اليوم' : focusCompletion ? `قراءة ${relativeDayLabel(focus.scheduledDate, today)} — تمت` : `Restore · ${formatLongDate(focus.scheduledDate)} — متاحة حتى الخميس ١١:٥٩ م`}
+                    {focus.scheduledDate === today ? 'قراءة اليوم' : focusCompletion ? `قراءة ${relativeDayLabel(focus.scheduledDate, today)} — تمت` : `Restore · ${formatLongDate(focus.scheduledDate)} — ${restoreDeadline(focus.scheduledDate) === today ? 'متاحة لحد آخر النهارده ١١:٥٩ م' : 'متاحة حتى الجمعة ١١:٥٩ م'}`}
                   </p>
                   <h2 id="focus-reading-title" className="text-xl font-black sm:text-2xl" style={{ color: p.text }}>{focus.passage.reference}</h2>
                   {focus.title && <p className="text-sm font-semibold" style={{ color: p.muted }}>{focus.title}</p>}
@@ -470,21 +488,32 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
               </header>
 
               <div className="space-y-3">
-                <AnimatePresence mode="wait">
-                  {focus.passage.verses.map((verse) => (
-                    <motion.p
+                {focus.passage.verses.length > 0 && (
+                  <p className="text-xs font-bold" style={{ color: p.muted }}>✨ اضغط على أي آية عشان تميّزها، واضغط تاني عشان تشيل التمييز.</p>
+                )}
+                {focus.passage.verses.map((verse) => {
+                  const marked = focusHighlights.includes(verse.number);
+                  return (
+                    <p
                       key={verse.number}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -8 }}
-                      transition={{ duration: 0.2 }}
-                      className="text-lg leading-10 sm:text-xl sm:leading-[2.6rem]" style={{ color: p.text }}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={marked}
+                      onClick={() => toggleHighlight(verse.number)}
+                      onKeyDown={(event: React.KeyboardEvent<HTMLParagraphElement>) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          toggleHighlight(verse.number);
+                        }
+                      }}
+                      className="cursor-pointer rounded-xl px-2 text-lg leading-10 transition-colors sm:text-xl sm:leading-[2.6rem]"
+                      style={{ color: p.text, backgroundColor: marked ? p.goldSoft : 'transparent', boxShadow: marked ? `inset -4px 0 0 ${p.accent}` : 'none' }}
                     >
                       <sup className="ml-1 text-xs font-black" style={{ color: p.accentText }}>{toArabicDigits(verse.number)}</sup>
                       {verse.text}
-                    </motion.p>
-                  ))}
-                </AnimatePresence>
+                    </p>
+                  );
+                })}
                 {focus.passage.verses.length === 0 && (
                   <p className="text-sm" style={{ color: p.muted }}>لا يتوفر نص هذه القراءة حاليًا.</p>
                 )}
@@ -496,15 +525,36 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
                     {!focusCompletion && <span className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs" style={{ backgroundColor: p.primary, color: '#F3DEAB' }}>١</span>}
                     سؤال للتأمل: {focus.questionText}
                   </label>
-                  <NoPasteTextarea
+                  <textarea
                     id="reading-answer"
                     value={answerDraft}
-                    onChange={(event) => setAnswerDraft(event.target.value.slice(0, 2000))}
+                    onChange={(event) => {
+                      const next = event.target.value.slice(0, 2000);
+                      // Keyboards' clipboard bars insert copied text as if typed: a big jump in one
+                      // keystroke (no one types 25+ characters at once) is treated as a paste.
+                      if (next.length - answerDraft.length > 25) {
+                        blockPaste(event);
+                        return;
+                      }
+                      setAnswerDraft(next);
+                    }}
+                    // The answer must be written by the student: no paste / drop (incl. phone keyboard clipboard).
+                    onPaste={blockPaste}
+                    onDrop={blockPaste}
+                    onBeforeInput={(event) => {
+                      const type = (event.nativeEvent as InputEvent).inputType;
+                      if (type === 'insertFromPaste' || type === 'insertFromDrop' || type === 'insertFromPasteAsQuotation') blockPaste(event);
+                    }}
+                    onContextMenu={(event) => event.preventDefault()}
+                    autoComplete="off"
                     rows={4}
                     placeholder={focusCompletion ? 'إجابتك...' : 'اكتب إجابتك هنا...'}
                     className="liquid-glass-input w-full resize-y rounded-2xl px-3 py-3 text-sm leading-7 outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A]"
                     style={{ color: p.text }}
                   />
+                  {pasteBlocked && (
+                    <p className="text-[11px] font-bold" role="status" style={{ color: p.error }}>اللصق مش مسموح — اكتب إجابتك بنفسك ✍️</p>
+                  )}
                   {focusAnswer && (
                     <p className="text-[11px]" style={{ color: p.muted }}>أرسلت إجابتك {formatLocalTime(focusAnswer.submittedAt)} — يمكنك تعديلها.</p>
                   )}
@@ -576,23 +626,19 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
 
               <div className="flex flex-wrap items-center gap-3">
                 {!focusCompletion ? (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.96 }}
+                  <button
                     type="button"
                     onClick={() => void handleMarkRead()}
                     disabled={submitting || !canComplete}
-                    className="inline-flex items-center gap-2 rounded-2xl px-6 py-3.5 text-base font-black shadow-lg disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-2xl px-6 py-3.5 text-base font-black shadow-lg transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
                     style={primaryButtonStyle(p)}
                   >
                     {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
                     تمت القراءة
-                  </motion.button>
+                  </button>
                 ) : (
                   focus.questionText && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.96 }}
+                    <button
                       type="button"
                       onClick={() => void handleSaveAnswer()}
                       disabled={submitting || answerDraft.trim() === (focusAnswer?.answerText ?? '')}
@@ -601,12 +647,12 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
                     >
                       {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       {focusAnswer ? 'حفظ التعديل' : 'إرسال الإجابة'}
-                    </motion.button>
+                    </button>
                   )
                 )}
                 {answerSaved && <span className="text-sm font-bold" style={{ color: p.success }}>تم حفظ إجابتك ✓</span>}
               </div>
-            </motion.article>
+            </article>
           ) : (
             <div className="liquid-glass-card rounded-3xl p-10 text-center">
               <BookOpen className="mx-auto h-10 w-10" style={{ color: p.accent }} />
@@ -620,6 +666,6 @@ export const MyReadingsScreen: React.FC<MyReadingsScreenProps> = ({ currentUser,
       )}
 
       {cameraOpen && <CameraCapture theme={theme} onCapture={handleCameraPhoto} onClose={() => setCameraOpen(false)} />}
-    </motion.div>
+    </div>
   );
 };

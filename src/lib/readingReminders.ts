@@ -1,7 +1,7 @@
 import type { ReadingAssignment } from '../types';
 import { findBibleBook } from './bible/books';
 import { formatBibleReference } from './bible/bibleService';
-import { reminderVerseOf } from './readings';
+import { fetchReadingAssignments, fetchReadingCompletions, reminderVerseOf } from './readings';
 
 /**
  * Daily reading reminders (in-app + browser notification).
@@ -93,5 +93,37 @@ export async function showDailyReadingReminder(assignment: ReadingAssignment, to
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Shows a system notification (through the service worker when available). */
+export async function showAppNotification(title: string, body: string, tag: string): Promise<boolean> {
+  if (reminderPermission() !== 'granted') return false;
+  const options: NotificationOptions = { body, icon: ICON, badge: ICON, tag, lang: 'ar', dir: 'rtl' };
+  try {
+    const registration = await serviceWorkerRegistration();
+    if (registration) await registration.showNotification(title, options);
+    else new Notification(title, options);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Runs when the app opens (any page): if today's chapter is not read yet,
+ * shows the daily notification with the chapter and its verse (once a day).
+ */
+export async function remindTodaysChapter(userId: string, role: string, today: string): Promise<void> {
+  if (reminderPermission() !== 'granted' || alreadyRemindedToday(today)) return;
+  try {
+    const assignments = (await fetchReadingAssignments({ fromDate: today, toDate: today }))
+      .filter((item) => item.scheduledDate === today && (role === 'student' || item.targetType === 'all'));
+    const todays = assignments[0];
+    if (!todays) return;
+    const done = await fetchReadingCompletions({ studentId: userId, assignmentIds: [todays.id] });
+    if (done.length === 0) await showDailyReadingReminder(todays, today);
+  } catch {
+    // Offline or not set up: try again next time the app opens.
   }
 }

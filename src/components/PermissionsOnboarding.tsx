@@ -9,12 +9,15 @@ import {
   requestNotificationPermission,
   type PermissionResult,
 } from '../lib/devicePermissions';
+import { ensurePushSubscription } from '../lib/push';
 
-const DONE_KEY = 'masiri.permissions-onboarding.v1';
+// Shown at most once a day while notifications or the camera are not allowed yet.
+const SHOWN_DAY_KEY = 'masiri.permissions-onboarding.day.v2';
+const todayKey = () => new Date().toISOString().slice(0, 10);
 
-function alreadyDone(): boolean {
+function shownToday(): boolean {
   try {
-    return window.localStorage.getItem(DONE_KEY) === '1';
+    return window.localStorage.getItem(SHOWN_DAY_KEY) === todayKey();
   } catch {
     return false;
   }
@@ -22,17 +25,37 @@ function alreadyDone(): boolean {
 
 function markDone() {
   try {
-    window.localStorage.setItem(DONE_KEY, '1');
+    window.localStorage.setItem(SHOWN_DAY_KEY, todayKey());
   } catch {
     // Storage blocked: the screen may show again next launch, which is harmless.
   }
 }
 
-/** Show on the first launch of the installed app (or with ?permissions=1 for testing). */
-export function shouldShowPermissionsOnboarding(): boolean {
+/** Forced with ?permissions=1 (e.g. from the «ask_permissions» notification). */
+export function permissionsForcedByLink(): boolean {
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('permissions') === '1';
+}
+
+/**
+ * True when the signed-in user should see the permissions screen: notifications
+ * or the camera are not allowed yet (asked once a day), or the link forces it.
+ */
+const isIphone = () => typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isAndroid = () => typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+
+/** iPhone Safari only allows notifications for apps added to the home screen. */
+function iphoneNeedsHomeScreen(): boolean {
+  return isIphone() && !isInstalledWebApp() && notificationState() === 'unsupported';
+}
+
+export async function needsPermissionsPrompt(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
-  const forced = new URLSearchParams(window.location.search).get('permissions') === '1';
-  return forced || (isInstalledWebApp() && !alreadyDone());
+  if (permissionsForcedByLink()) return true;
+  const missing = (state: PermissionResult) => state === 'prompt' || state === 'denied';
+  // Notifications are required: ask on every app open until allowed.
+  if (missing(notificationState()) || iphoneNeedsHomeScreen()) return true;
+  if (shownToday()) return false;
+  return missing(await cameraState());
 }
 
 interface PermissionsOnboardingProps {
@@ -53,7 +76,22 @@ export const PermissionsOnboarding: React.FC<PermissionsOnboardingProps> = ({ th
 
   useEffect(() => {
     void cameraState().then(setCamera);
+    // Coming back from the phone's settings: read the permissions again.
+    const recheck = () => {
+      if (document.visibilityState !== 'visible') return;
+      const n = notificationState();
+      setNotifications(n);
+      if (n === 'granted') void ensurePushSubscription();
+      void cameraState().then(setCamera);
+    };
+    document.addEventListener('visibilitychange', recheck);
+    return () => document.removeEventListener('visibilitychange', recheck);
   }, []);
+
+  const needsHomeScreen = iphoneNeedsHomeScreen();
+  // Notifications are required (unless this phone/browser can't do them at all).
+  const notificationsMissing = notifications === 'prompt' || notifications === 'denied';
+  const canClose = !notificationsMissing;
 
   const finish = () => {
     markDone();
@@ -65,10 +103,13 @@ export const PermissionsOnboarding: React.FC<PermissionsOnboardingProps> = ({ th
     // Ask one after the other: browsers show one system prompt at a time.
     const n = notifications === 'granted' ? 'granted' : await requestNotificationPermission();
     setNotifications(n);
+    if (n === 'granted') void ensurePushSubscription();
     const c = camera === 'granted' ? 'granted' : await requestCameraPermission();
     setCamera(c);
     setBusy(false);
-    if (n !== 'prompt' && c !== 'prompt') window.setTimeout(finish, 900);
+    if (n === 'granted' || n === 'unsupported') {
+      if (c !== 'prompt') window.setTimeout(finish, 900);
+    }
   };
 
   const row = (icon: React.ReactNode, title: string, why: string, state: PermissionResult) => (
@@ -86,7 +127,6 @@ export const PermissionsOnboarding: React.FC<PermissionsOnboardingProps> = ({ th
     </li>
   );
 
-  const anyDenied = notifications === 'denied' || camera === 'denied';
 
   return createPortal(
     <div className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="permissions-title" dir="rtl">
@@ -95,9 +135,9 @@ export const PermissionsOnboarding: React.FC<PermissionsOnboardingProps> = ({ th
         className="relative z-10 w-full max-w-md space-y-5 rounded-t-3xl border p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] text-center shadow-2xl sm:rounded-3xl sm:pb-6"
         style={{ backgroundColor: dark ? 'rgba(32,24,34,.98)' : '#FFFFFF', borderColor: dark ? 'rgba(214,184,120,.35)' : '#E7E2E0' }}
       >
-        <button type="button" onClick={finish} className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl" style={{ color: dark ? '#B8B1BB' : '#77717A' }} aria-label="لاحقًا">
+        {canClose && <button type="button" onClick={finish} className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl" style={{ color: dark ? '#B8B1BB' : '#77717A' }} aria-label="لاحقًا">
           <X className="h-5 w-5" />
-        </button>
+        </button>}
         <img
           src="/masiri-journey-icon.jpg?v=20261010-2"
           alt="شعار THE APOSTLES"
@@ -117,20 +157,53 @@ export const PermissionsOnboarding: React.FC<PermissionsOnboardingProps> = ({ th
           {row(<Bell className="h-5 w-5" />, 'الإشعارات', 'تذكير يومي بإصحاح النهارده وآية منه.', notifications)}
           {row(<Camera className="h-5 w-5" />, 'الكاميرا', 'صورة بعد القراءة عشان يتحسب اليوم في الـ 🔥.', camera)}
         </ul>
-        {anyDenied && (
+        {needsHomeScreen && (
+          <div className="space-y-1.5 rounded-2xl p-3.5 text-right text-xs leading-6" style={{ backgroundColor: dark ? 'rgba(118,36,58,.35)' : '#F3E7EB', color: dark ? '#F5F1F0' : '#272329' }}>
+            <p className="font-black">📲 على الآيفون الإشعارات بتشتغل بس لما التطبيق يكون على الشاشة الرئيسية:</p>
+            <p>١. دوس زر المشاركة <b>⬆️</b> تحت في Safari</p>
+            <p>٢. اختار <b>«إضافة إلى الشاشة الرئيسية»</b></p>
+            <p>٣. افتح التطبيق من الأيقونة الجديدة ودوس <b>«سماح»</b></p>
+          </div>
+        )}
+        {notifications === 'denied' && (
+          <div className="space-y-1.5 rounded-2xl p-3.5 text-right text-xs leading-6" style={{ backgroundColor: dark ? 'rgba(179,59,73,.18)' : '#F9E9EB', color: dark ? '#F5F1F0' : '#272329' }}>
+            <p className="font-black" style={{ color: dark ? '#F08089' : '#B33B49' }}>الإشعارات مقفولة — لازم تفتحها عشان توصلك قراءة كل يوم:</p>
+            {isIphone() ? (
+              <p>الإعدادات ← <b>الإشعارات</b> ← <b>THE APOSTLES</b> ← شغّل <b>«السماح بالإشعارات»</b></p>
+            ) : isAndroid() ? (
+              <>
+                <p>الإعدادات ← <b>التطبيقات</b> ← <b>THE APOSTLES</b> (أو <b>Chrome</b>) ← <b>الإشعارات</b> ← تشغيل</p>
+                <p>أو من المتصفح: دوس <b>🔒</b> جنب الرابط ← <b>الأذونات / Permissions</b> ← <b>الإشعارات</b> ← سماح</p>
+              </>
+            ) : (
+              <p>دوس <b>🔒</b> جنب الرابط ← <b>الإشعارات</b> ← سماح</p>
+            )}
+            <p>وبعدين ارجع هنا — هتتحدث لوحدها.</p>
+          </div>
+        )}
+        {camera === 'denied' && (
           <p className="text-xs leading-6" style={{ color: dark ? '#F08089' : '#B33B49' }}>
-            لو رفضت إذن، تقدر تفعّله بعدين من إعدادات الموبايل ← التطبيقات ← THE APOSTLES.
+            الكاميرا مقفولة: فعّلها بنفس الطريقة من الإعدادات (الكاميرا ← سماح) عشان تقدر تصور بعد القراءة.
           </p>
         )}
         <button
           type="button"
-          onClick={() => void (notifications !== 'prompt' && camera !== 'prompt' ? finish() : allow())}
+          onClick={() => {
+            if (notifications === 'denied') {
+              // Re-read after the user changed it in the phone's settings.
+              const n = notificationState();
+              setNotifications(n);
+              if (n === 'granted') void ensurePushSubscription();
+              return;
+            }
+            void (notifications !== 'prompt' && camera !== 'prompt' ? finish() : allow());
+          }}
           disabled={busy}
           className="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-base font-black shadow-lg disabled:opacity-60"
           style={{ background: 'linear-gradient(135deg, #76243A 0%, #5D192D 100%)', color: dark ? '#F3DEAB' : '#FFFFFF' }}
         >
           {busy && <Loader2 className="h-5 w-5 animate-spin" />}
-          {notifications !== 'prompt' && camera !== 'prompt' ? 'يلا نبدأ' : 'سماح'}
+          {notifications === 'denied' ? 'فعّلتها — تحقق تاني' : notifications !== 'prompt' && camera !== 'prompt' ? 'يلا نبدأ' : 'سماح'}
         </button>
       </div>
     </div>,

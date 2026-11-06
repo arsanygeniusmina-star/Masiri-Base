@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchReadingAssignments, fetchReadingCompletions, fetchReadingStreaks, restorableMissedReadings } from './readings';
-import { addDaysToKey, localDateKey, readingWeekStart } from './readingDates';
+import { addDaysToKey, localDateKey, restoreWindowStart } from './readingDates';
 import { READINGS_PREVIEW_MODE, loadPreviewReadings } from './readingsPreview';
 
 export const STREAK_CHANGED_EVENT = 'masiri:reading-streak-changed';
@@ -19,8 +19,8 @@ export function announceReadingStreakChanged(state?: StreakState) {
 }
 
 async function countRestorable(userId: string, today: string): Promise<number> {
-  const weekStart = readingWeekStart(today);
-  if (weekStart >= today) return 0; // Friday: nothing earlier in this week yet.
+  const weekStart = restoreWindowStart(today);
+  if (weekStart >= today) return 0; // Nothing earlier that can still be restored.
   const assignments = await fetchReadingAssignments({ fromDate: weekStart, toDate: addDaysToKey(today, -1), includeVerses: false });
   if (assignments.length === 0) return 0;
   const completions = await fetchReadingCompletions({ studentId: userId, assignmentIds: assignments.map((a) => a.id) });

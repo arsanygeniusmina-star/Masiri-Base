@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Compass,
+  LayoutGrid,
   LogIn,
   UserPlus,
   User as UserIcon,
@@ -10,13 +11,16 @@ import {
   Sun,
   LogOut,
   Trophy,
+  ShieldAlert,
   Database,
   BookOpen,
   BookMarked,
+  Users,
 } from 'lucide-react';
 import type { User } from '../types';
 import { StreakBadge } from './readings/StreakBadge';
 import type { StreakState } from '../lib/useReadingStreak';
+import { canUseSpinWheel } from '../screens/SpinWheelScreen';
 
 export type AppScreen =
   | 'get-started'
@@ -30,7 +34,11 @@ export type AppScreen =
   | 'test'
   | 'my-readings'
   | 'bible-study'
-  | 'ranking';
+  | 'ranking'
+  | 'review'
+  | 'spin-wheel'
+  | 'warini'
+  | 'widgets';
 
 interface NavigationTaskbarProps {
   currentScreen: AppScreen;
@@ -44,6 +52,8 @@ interface NavigationTaskbarProps {
   streak?: StreakState | null;
   /** Opens the first missed reading that can still be restored this week. */
   onRestore?: () => void;
+  /** Head servants: flagged answers waiting in «متابعة» (red counter). */
+  reviewCount?: number;
 }
 
 type NavigationItem = {
@@ -63,12 +73,17 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
   simulationMode = false,
   streak = null,
   onRestore,
+  reviewCount = 0,
 }) => {
   const isHead = currentUser?.role === 'head';
   const isTeacher = currentUser?.role === 'teacher';
   const isTest = currentUser?.role === 'test';
   const isStudent = currentUser?.role === 'student';
   const isServant = isHead || isTeacher;
+  // «عجلة الحظ» — one account only.
+  const wheelItem: NavigationItem[] = canUseSpinWheel(currentUser?.email) && !simulationMode
+    ? [{ id: 'spin-wheel', label: 'عجلة الحظ', icon: Sparkles }]
+    : [];
   // Everyone (students and servants) reads «إصحاح النهارده»; servants also manage the Bible readings.
   const readingItem: NavigationItem[] = isStudent
     ? [{ id: 'my-readings', label: 'إصحاح النهارده', icon: BookMarked }]
@@ -85,7 +100,10 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
   const desktopItems: NavigationItem[] = [
     { id: 'get-started', label: 'الرئيسية', icon: Compass },
     ...(currentUser ? [{ id: 'ranking' as const, label: 'الترتيب', icon: Trophy }] : []),
+    ...(currentUser && !isTest ? [{ id: 'warini' as const, label: 'ورينى', icon: Users }] : []),
     ...readingItem,
+    ...(isHead && !simulationMode ? [{ id: 'review' as const, label: 'متابعة', icon: ShieldAlert }] : []),
+    ...wheelItem,
     ...(!currentUser
       ? [
           { id: 'login' as const, label: 'دخول', icon: LogIn },
@@ -94,6 +112,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
       : [{ id: 'profile' as const, label: 'حسابي', icon: UserIcon }]),
     ...(isHead && !simulationMode ? [{ id: 'supabase' as const, label: 'قاعدة البيانات', icon: Database }] : []),
     ...(isTest ? [{ id: 'test' as const, label: 'مركز الاختبار', icon: Database }] : []),
+    ...(!currentUser || isTest ? [] : [{ id: 'widgets' as const, label: 'الأدوات', icon: LayoutGrid }]),
   ];
 
   // The phone taskbar is deliberately compact. Session controls stay reachable
@@ -102,10 +121,12 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
     ? [
         { id: 'get-started', label: 'الرئيسية', icon: Compass },
         { id: 'ranking', label: 'الترتيب', icon: Trophy },
+        ...(!isTest ? [{ id: 'warini' as const, label: 'ورينى', icon: Users }] : []),
         ...readingItem.map((item) => ({ ...item, label: item.id === 'bible-study' ? 'الكتاب' : item.label })),
         { id: 'profile', label: 'حسابي', icon: UserIcon },
-        ...(isHead && !simulationMode ? [{ id: 'supabase' as const, label: 'البيانات', icon: Database }] : []),
+        ...(isHead && !simulationMode ? [{ id: 'review' as const, label: 'متابعة', icon: ShieldAlert }] : []),
         ...(isTest ? [{ id: 'test' as const, label: 'اختبار', icon: Database }] : []),
+        ...(!currentUser || isTest ? [] : [{ id: 'widgets' as const, label: 'أدوات', icon: LayoutGrid }]),
         { id: 'logout', label: 'خروج', icon: LogOut, action: 'logout' },
       ]
     : [
@@ -257,6 +278,11 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>
+                  {item.id === 'review' && reviewCount > 0 && (
+                <span dir="ltr" className=" min-w-[1.1rem] rounded-full bg-[#D33A4A] px-1 text-[10px] font-black leading-[1.1rem] text-white" aria-label={`${reviewCount} إجابة تحتاج مراجعة`}>
+                  {reviewCount > 99 ? '99+' : reviewCount}
+                </span>
+              )}
                 </button>
               );
             })}
@@ -318,7 +344,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
               aria-current={active ? 'page' : undefined}
               aria-label={item.label}
               title={item.label}
-              className="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[11px] font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] sm:text-xs"
+              className="relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[11px] font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A15A] sm:text-xs"
               style={{
                 color: active ? (theme === 'dark' ? '#F3DEAB' : '#76243A') : (theme === 'dark' ? '#B8B1BB' : '#77717A'),
                 backgroundColor: active ? (theme === 'dark' ? 'rgba(118,36,58,.45)' : '#F8EEF1') : 'transparent',
@@ -326,6 +352,11 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
             >
               <Icon className="h-5 w-5 shrink-0" />
               <span className="max-w-full truncate">{item.label}</span>
+              {item.id === 'review' && reviewCount > 0 && (
+                <span dir="ltr" className="absolute -top-1 left-1/2 ml-2 min-w-[1.1rem] rounded-full bg-[#D33A4A] px-1 text-[10px] font-black leading-[1.1rem] text-white" aria-label={`${reviewCount} إجابة تحتاج مراجعة`}>
+                  {reviewCount > 99 ? '99+' : reviewCount}
+                </span>
+              )}
             </button>
           );
         })}

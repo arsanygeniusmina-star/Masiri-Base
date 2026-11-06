@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { findBibleBook } from './bible/books';
-import { addDaysToKey, canCompleteReadingOn, compareDateKeys, localDateKey, readingWeekStart } from './readingDates';
+import { addDaysToKey, canCompleteReadingOn, compareDateKeys, localDateKey, restoreWindowStart } from './readingDates';
 import type {
   BiblePassage,
   BibleVerse,
@@ -247,7 +247,17 @@ export async function fetchReadingAnswers(filter: { studentId?: string; assignme
     },
     'تعذر تحميل الإجابات.',
   );
-  return rows.map(mapAnswer);
+  return decryptPrivateAnswers(rows.map(mapAnswer));
+}
+
+/** Private accounts store «🔒» in the table; the owner (and guardian) get the real text here. */
+const LOCKED = '🔒';
+async function decryptPrivateAnswers(answers: ReadingAnswer[]): Promise<ReadingAnswer[]> {
+  const locked = answers.filter((answer) => answer.answerText === LOCKED).map((answer) => answer.id);
+  if (locked.length === 0) return answers;
+  const { data } = await supabase.rpc('get_answer_texts', { p_answer_ids: locked });
+  const plain = new Map(((data ?? []) as Array<{ answer_id: string; answer_text: string }>).map((row) => [row.answer_id, row.answer_text]));
+  return answers.map((answer) => (plain.has(answer.id) ? { ...answer, answerText: plain.get(answer.id) ?? answer.answerText } : answer));
 }
 
 /** Students the signed-in servant may see (teacher: own grade; head: all). */
@@ -335,6 +345,14 @@ export async function deleteDraftReadingAssignment(assignmentId: string): Promis
 }
 
 /** Saves (or edits) the student's answer. */
+/**
+ * Asks the server (Edge Function "check-answer", NVIDIA AI) to check an answer.
+ * Fire-and-forget: the reading is already saved, failures are ignored.
+ */
+export function requestAnswerCheck(answerId: string): void {
+  void supabase.functions.invoke('check-answer', { body: { answer_id: answerId } }).catch(() => undefined);
+}
+
 export async function saveReadingAnswer(assignmentId: string, studentId: string, answerText: string): Promise<ReadingAnswer> {
   const text = answerText.trim();
   const inserted = await supabase
@@ -342,7 +360,7 @@ export async function saveReadingAnswer(assignmentId: string, studentId: string,
     .insert({ assignment_id: assignmentId, student_id: studentId, answer_text: text })
     .select('id, assignment_id, student_id, answer_text, submitted_at, updated_at')
     .single();
-  if (!inserted.error && inserted.data) return mapAnswer(inserted.data);
+  if (!inserted.error && inserted.data) return { ...mapAnswer(inserted.data), answerText: text };
 
   if (inserted.error?.code === '23505') {
     // Already answered: update only the text (the only column students may change).
@@ -353,30 +371,26 @@ export async function saveReadingAnswer(assignmentId: string, studentId: string,
       .eq('student_id', studentId)
       .select('id, assignment_id, student_id, answer_text, submitted_at, updated_at')
       .single();
-    if (!updated.error && updated.data) return mapAnswer(updated.data);
+    if (!updated.error && updated.data) return { ...mapAnswer(updated.data), answerText: text };
     throw friendlyError(updated.error, 'تعذر حفظ إجابتك.');
   }
   throw friendlyError(inserted.error, 'تعذر حفظ إجابتك.');
 }
 
 /* -------------------------------------------------------------------------- */
-/* Photo proof (Supabase Storage + Extreme Compression)                       */
+/* Photo proof                                                                 */
 /* -------------------------------------------------------------------------- */
 
-// Supabase Storage bucket name (uses supabase imported at top of file)
 export const READING_PHOTO_BUCKET = 'reading-photos';
-
-// ULTRA-EXTREME compression settings for reading photos
-const READING_PHOTO_MAX_EDGE = 640;         // Max 640px (was 800)
-const READING_PHOTO_QUALITY = 0.45;         // 45% quality (was 60%)
-const READING_PHOTO_MAX_BYTES = 50 * 1024;  // 50 KB hard limit (was 100KB)
+const MAX_PHOTO_EDGE = 1600;
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
-/** Compresses reading photo to ~15-40 KB (max 640px, 45% quality). */
+/** Resizes and re-encodes a camera photo to JPEG (~200–600 KB) before upload. */
 export async function compressReadingPhoto(file: File): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, READING_PHOTO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -384,62 +398,33 @@ export async function compressReadingPhoto(file: File): Promise<Blob> {
     if (!context) throw new Error('no canvas');
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-
-    // Aggressive progressive quality reduction: 0.45 → 0.35 → 0.28 → 0.22 → 0.18
-    let quality = READING_PHOTO_QUALITY;
-    let blob: Blob | null = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', quality)
-      );
-      if (blob && blob.size <= READING_PHOTO_MAX_BYTES) break;
-      quality = Math.max(0.15, quality - 0.07);
-    }
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
     if (blob && blob.size > 0) return blob;
   } catch {
-    // Fall through to fallback
+    // Some formats (e.g. HEIC on desktop Chrome) cannot be decoded; fall back to the original.
   }
-
-  // Fallback: return original if valid type and small enough
-  if (ALLOWED_PHOTO_TYPES.includes(file.type) && file.size <= READING_PHOTO_MAX_BYTES) return file;
-  throw new ReadingDataError('الصورة كبيرة جداً حتى بعد الضغط الشديد. التقط صورة أبسط (ورقة بيضاء/كتاب مفتوح) أو اقرب أكثر.');
+  if (ALLOWED_PHOTO_TYPES.includes(file.type) && file.size <= MAX_UPLOAD_BYTES) return file;
+  throw new ReadingDataError('تعذر قراءة الصورة. التقط صورة جديدة بالكاميرا.');
 }
 
-/** Uploads compressed reading photo to Supabase Storage. Returns storage path. */
+/** Uploads the proof photo to <student>/<assignment>/<file> and returns its storage path. */
 export async function uploadReadingPhoto(assignmentId: string, studentId: string, photo: Blob): Promise<string> {
-  // Compress first
-  const compressed = await compressReadingPhoto(photo as File);
-
-  const ext = compressed.type === 'image/png' ? 'png' : 'jpg';
+  const extension = photo.type === 'image/png' ? 'png' : photo.type === 'image/webp' ? 'webp' : photo.type.startsWith('image/hei') ? 'heic' : 'jpg';
   const random = Math.random().toString(36).slice(2, 10);
-  const path = `${studentId}/${assignmentId}/${Date.now()}-${random}.${ext}`;
-
-  const { error } = await supabase.storage
-    .from(READING_PHOTO_BUCKET)
-    .upload(path, compressed, {
-      contentType: compressed.type || 'image/jpeg',
-      cacheControl: '31536000', // 1 year
-      upsert: false,
-    });
-
-  if (error) {
-    const msg = error.message.includes('Payload Too Large')
-      ? 'الصورة لا تزال كبيرة. التقط صورة أبسط.'
-      : 'تعذر رفع الصورة. تحقق من الاتصال.';
-    throw new ReadingDataError(msg, error);
-  }
+  const path = `${studentId}/${assignmentId}/${Date.now()}-${random}.${extension}`;
+  const { error } = await supabase.storage.from(READING_PHOTO_BUCKET).upload(path, photo, {
+    contentType: photo.type || 'image/jpeg',
+    cacheControl: '3600',
+    upsert: false,
+  });
+  if (error) throw friendlyError(error, 'تعذر رفع الصورة. حاول مرة أخرى.');
   return path;
 }
 
-/** Creates a signed URL (1 hour) for a reading photo in Supabase Storage. */
+/** Short-lived private link to view a proof photo (RLS decides who may). */
 export async function getReadingPhotoUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage
-    .from(READING_PHOTO_BUCKET)
-    .createSignedUrl(path, 60 * 60); // 1 hour
-
-  if (error || !data?.signedUrl) {
-    throw new ReadingDataError('تعذر عرض الصورة.', error);
-  }
+  const { data, error } = await supabase.storage.from(READING_PHOTO_BUCKET).createSignedUrl(path, 60 * 60);
+  if (error || !data?.signedUrl) throw friendlyError(error, 'تعذر عرض الصورة.');
   return data.signedUrl;
 }
 
@@ -528,10 +513,10 @@ export function computeReadingStreak(studentId: string, completionDates: string[
   }
   // `run` is now the length of the run ending on the most recent reading day.
   // It stays alive if it reached yesterday, or if every day missed since then can
-  // still be restored (inside this Friday → Thursday week) — mirrors the database.
+  // still be restored (this Friday → Thursday week, plus last week on Friday) — mirrors the database.
   const last = days.length ? days[days.length - 1] : undefined;
   const yesterday = addDaysToKey(today, -1);
-  const beforeThisWeek = addDaysToKey(readingWeekStart(today), -1);
+  const beforeThisWeek = addDaysToKey(restoreWindowStart(today), -1);
   const aliveFrom = beforeThisWeek < yesterday ? beforeThisWeek : yesterday;
   const alive = last !== undefined && compareDateKeys(last, aliveFrom) >= 0;
   return {

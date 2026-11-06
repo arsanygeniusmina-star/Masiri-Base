@@ -12,9 +12,19 @@ export const DEFAULT_MINISTRY_TIME_ZONE = 'Africa/Cairo';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
-/** Local calendar date key, e.g. '2026-10-23'. */
-export function localDateKey(date: Date = new Date()): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+/**
+ * LAUNCH NIGHT: the app was sent to everyone on the evening of 30 Oct 2026 and the
+ * plan starts on 31 Oct. Reading that evening counts as 31 Oct (the database accepts
+ * it because it is within one day of server time); from midnight on this does nothing.
+ */
+const LAUNCH_EVENING = '2026-10-30';
+const LAUNCH_DAY = '2026-10-31';
+
+/** Local calendar date key, e.g. '2026-10-23'. With no argument it means "today". */
+export function localDateKey(date?: Date): string {
+  const value = date ?? new Date();
+  const key = `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+  return date === undefined && key === LAUNCH_EVENING ? LAUNCH_DAY : key;
 }
 
 /** Parses 'YYYY-MM-DD' as a local date at noon (avoids DST edge cases). */
@@ -42,9 +52,23 @@ export function readingWeekStart(key: string): string {
   return addDaysToKey(key, -((day - 5 + 7) % 7));
 }
 
-/** A reading can be completed on its day, or restored later in the same Friday → Thursday week. */
+/**
+ * First day that can still be restored today: the start of this Friday → Thursday
+ * week — except on Friday, which is a grace day for the whole week that just ended
+ * (mirrors private.restore_window_start in the database).
+ */
+export function restoreWindowStart(today: string): string {
+  return readingWeekStart(addDaysToKey(today, -1));
+}
+
+/** A reading can be completed on its day, or restored later in its week (and on the Friday after it). */
 export function canCompleteReadingOn(scheduledDate: string, today: string): boolean {
-  return scheduledDate <= today && readingWeekStart(scheduledDate) === readingWeekStart(today);
+  return scheduledDate <= today && scheduledDate >= restoreWindowStart(today);
+}
+
+/** Last day a missed reading can be restored: the Friday after its week. */
+export function restoreDeadline(scheduledDate: string): string {
+  return addDaysToKey(readingWeekStart(scheduledDate), 7);
 }
 
 export function deviceTimeZone(): string {
