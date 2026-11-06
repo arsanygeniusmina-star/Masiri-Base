@@ -30,48 +30,18 @@ export default defineConfig(() => {
       },
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: [
-          'masiri-journey-icon.jpg',
-          'logo-family.jpg',
-          'logo-church-light.png',
-          'logo-church-dark.png',
-          'apple-touch-icon.png',
-          'pwa-192x192.png',
-          'pwa-512x512.png',
-          'pwa-maskable-512x512.png',
-        ],
+        includeAssets: ['masiri-journey-icon.jpg', 'logo-family.jpg', 'logo-church-light.png', 'logo-church-dark.png'],
         manifest: {
           id: '/',
           name: 'THE APOSTLES',
           short_name: 'THE APOSTLES',
-          description:
-            'تطبيق THE APOSTLES لخدمة المرحلة الإعدادية الكنسية - رحلة النمو الروحي والتعليمي للطلاب والخدام',
+          description: 'تطبيق THE APOSTLES لخدمة المرحلة الإعدادية الكنسية - رحلة النمو الروحي والتعليمي للطلاب والخدام',
           theme_color: '#76243A',
           background_color: '#141117',
           display: 'standalone',
-          orientation: 'portrait',
           start_url: '/',
           scope: '/',
-          categories: ['lifestyle', 'education', 'religion'],
           icons: [
-            {
-              src: '/pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-maskable-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
             {
               src: '/masiri-journey-icon.jpg?v=20261010-2',
               sizes: '256x256',
@@ -79,32 +49,6 @@ export default defineConfig(() => {
               purpose: 'any',
             },
           ],
-          screenshots: [
-            {
-              src: '/pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              form_factor: 'wide',
-              label: 'THE APOSTLES - شاشة principale',
-            },
-            {
-              src: '/pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              form_factor: 'narrow',
-              label: 'THE APOSTLES - شاشة الجوال',
-            },
-          ],
-          share_target: {
-            action: '/share',
-            method: 'POST',
-            enctype: 'multipart/form-data',
-            params: {
-              title: 'title',
-              text: 'text',
-              url: 'url',
-            },
-          },
         },
         // Push notifications (shown even when the app is closed): public/push-sw.js
         workbox: {

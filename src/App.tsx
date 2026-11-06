@@ -28,8 +28,6 @@ import { localDateKey } from './lib/readingDates';
 import { ReviewScreen } from './screens/ReviewScreen';
 import { SpinWheelScreen, canUseSpinWheel } from './screens/SpinWheelScreen';
 import { WariniScreen } from './screens/WariniScreen';
-import { WidgetsScreen } from './screens/WidgetsScreen';
-import { WidgetViewScreen } from './screens/WidgetViewScreen';
 import { PermissionsOnboarding, needsPermissionsPrompt, permissionsForcedByLink } from './components/PermissionsOnboarding';
 import { startTestRuntimeLogCapture } from './lib/testRuntimeLogs';
 
@@ -91,7 +89,7 @@ export default function App() {
   // page is open, show the login page instead of an empty screen.
   useEffect(() => {
     if (!sessionReady || currentUser) return;
-    const signedInOnly: AppScreen[] = ['dashboard', 'student-dashboard', 'servant-dashboard', 'my-readings', 'bible-study', 'ranking', 'review', 'test', 'supabase', 'spin-wheel', 'warini', 'widgets', 'widget-view'];
+    const signedInOnly: AppScreen[] = ['dashboard', 'student-dashboard', 'servant-dashboard', 'my-readings', 'bible-study', 'ranking', 'review', 'test', 'supabase', 'spin-wheel', 'warini'];
     // The home page is "Coming Soon" for now, so signed-out visitors start at login.
     if (signedInOnly.includes(currentScreen) || currentScreen === 'get-started') setCurrentScreen('login');
   }, [sessionReady, currentUser, currentScreen]);
@@ -283,10 +281,6 @@ export default function App() {
       if (!allowed) return;
     }
     if (screen === 'ranking' && !currentUser) {
-      setCurrentScreen('login');
-      return;
-    }
-    if (screen === 'widgets' && !currentUser) {
       setCurrentScreen('login');
       return;
     }
@@ -504,12 +498,6 @@ export default function App() {
                 openUserId={wariniOpenUser}
                 onOpenedUser={() => setWariniOpenUser(null)}
               />
-            )}
-            {currentScreen === 'widgets' && currentUser && (
-              <WidgetsScreen currentUser={displayUser} theme={theme} />
-            )}
-            {currentScreen === 'widget-view' && currentUser && (
-              <WidgetViewScreen currentUser={displayUser} />
             )}
             {currentScreen === 'ranking' && displayUser && displayUser.role !== 'test' && (
               <RankingScreen currentUser={displayUser} theme={theme} simulationMode={simulationMode} />

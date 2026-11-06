@@ -33,19 +33,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
-
-        <!-- Home Screen Widget -->
-        <receiver
-            android:name=".MasiriWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.masiri.app.action.REFRESH_WIDGET" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info" />
-        </receiver>
     </application>
 
     <!-- Permissions -->
