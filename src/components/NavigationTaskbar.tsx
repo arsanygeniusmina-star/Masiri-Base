@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Clock,
   Compass,
   LayoutGrid,
   LogIn,
@@ -38,7 +39,8 @@ export type AppScreen =
   | 'review'
   | 'spin-wheel'
   | 'warini'
-  | 'widgets';
+  | 'widgets'
+  | 'widget-view';
 
 interface NavigationTaskbarProps {
   currentScreen: AppScreen;
@@ -113,6 +115,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
     ...(isHead && !simulationMode ? [{ id: 'supabase' as const, label: 'قاعدة البيانات', icon: Database }] : []),
     ...(isTest ? [{ id: 'test' as const, label: 'مركز الاختبار', icon: Database }] : []),
     ...(!currentUser || isTest ? [] : [{ id: 'widgets' as const, label: 'الأدوات', icon: LayoutGrid }]),
+    ...(!currentUser || isTest ? [] : [{ id: 'widget-view' as const, label: 'عرض الأداة', icon: Clock }]),
   ];
 
   // The phone taskbar is deliberately compact. Session controls stay reachable
@@ -127,6 +130,7 @@ export const NavigationTaskbar: React.FC<NavigationTaskbarProps> = ({
         ...(isHead && !simulationMode ? [{ id: 'review' as const, label: 'متابعة', icon: ShieldAlert }] : []),
         ...(isTest ? [{ id: 'test' as const, label: 'اختبار', icon: Database }] : []),
         ...(!currentUser || isTest ? [] : [{ id: 'widgets' as const, label: 'أدوات', icon: LayoutGrid }]),
+        ...(!currentUser || isTest ? [] : [{ id: 'widget-view' as const, label: 'عرض الأداة', icon: Clock }]),
         { id: 'logout', label: 'خروج', icon: LogOut, action: 'logout' },
       ]
     : [
